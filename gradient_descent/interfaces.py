@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-
+from model.analysis_function import Function
 from model.system_model import SystemModel
 
 
-class ParameterHandler(ABC):
+class ParameterHandler(Function):
     """
     Handles the extraction and insertion of optimizable parameters.
 
@@ -35,7 +35,7 @@ class ParameterHandler(ABC):
         """
         pass
 
-class CostFunction(ABC):
+class CostFunction(Function):
     """
     Defines the cost function to be minimized by the optimization algorithm.
 
@@ -57,7 +57,7 @@ class CostFunction(ABC):
         """
         pass
 
-class StopCriteria(ABC):
+class StopFunction(Function):
     """
     Defines the criteria for stopping the optimization algorithm.
 
@@ -82,7 +82,17 @@ class StopCriteria(ABC):
         """
         pass
 
-class GradientFunction(ABC):
+    @abstractmethod
+    def solution(self, system: SystemModel):
+        """Returns the solution it considers the best"""
+        pass
+
+    @abstractmethod
+    def solution_cost(self):
+        """Returns the cost value of the solution"""
+        pass
+
+class GradientFunction(Function):
     """
     Calculates the gradient of the cost function.
 
@@ -104,7 +114,7 @@ class GradientFunction(ABC):
         """
         pass
 
-class UpdateFunction(ABC):
+class UpdateFunction(Function):
     """
     Defines the update rule for the optimization algorithm.
 

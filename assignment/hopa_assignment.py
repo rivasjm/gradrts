@@ -1,6 +1,6 @@
 import sys
 
-from assignment.pd_assignment import PDAssignment
+from assignment.assignments import PDAssignment
 from model.analysis_function import globalize_deadlines, extract_assignment, insert_assignment, calculate_priorities, \
     normalize_priorities, AnalysisFunction
 from model.linear_system import LinearSystem, Task, Processor, Flow

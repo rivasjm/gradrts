@@ -3,7 +3,7 @@ from random import Random
 
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from assignment.hopa_assignment import HOPAssignment
-from assignment.pd_assignment import PDAssignment
+from assignment.assignments import PDAssignment
 from examples.example_models import get_palencia_system
 from examples.generator import generate_system
 from model.linear_system import SchedulerType

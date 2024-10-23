@@ -5,7 +5,7 @@ from model.linear_system import LinearSystem
 
 
 class HolisticFPAnalysis(AnalysisFunction):
-    def __init__(self, limit_factor=10, reset=True, verbose=False):
+    def __init__(self, limit_factor=10, reset=False, verbose=False):
         self.limit_factor = limit_factor
         self.reset = reset
         self.verbose = verbose
@@ -42,7 +42,12 @@ class HolisticFPAnalysis(AnalysisFunction):
                         if r > task.wcrt:
                             task.wcrt = r
                         if r > limit:
-                            self.reset_wcrts(system)
+                            if self.reset:
+                                self.reset_wcrts(system)
+                            else:
+                                for t in task.all_successors:
+                                    t.wcrt = task.wcrt
+                            return
 
                     if w <= p * task.period:
                         break  # no need to try more p's

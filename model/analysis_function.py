@@ -3,7 +3,15 @@ from abc import ABC, abstractmethod
 from model.linear_system import LinearSystem, Task
 
 
-class AnalysisFunction(ABC):
+class Function(ABC):
+    def reset(self):
+        pass
+
+    def __repr__(self):
+        return type(self).__name__
+
+
+class AnalysisFunction(Function):
     @abstractmethod
     def apply(self, system: LinearSystem) -> LinearSystem:
         pass
