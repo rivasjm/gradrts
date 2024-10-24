@@ -1,10 +1,10 @@
 import math
 
-from model.analysis_function import reset_wcrt, init_wcrt, LimitFactorReachedException
+from model.analysis_function import reset_wcrt, init_wcrt, LimitFactorReachedException, AnalysisFunction
 from model.linear_system import Task, LinearSystem, SchedulerType, is_scheduler_type
 
 
-class HolisticLocalEDFAnalysis:
+class HolisticLocalEDFAnalysis(AnalysisFunction):
     """
     Based on paper "Optimized Deadline Assignment and schedulability Analysis for Distributed Real-Time Systems
     with Local EDF Scheduling

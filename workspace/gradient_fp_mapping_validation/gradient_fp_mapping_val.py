@@ -8,8 +8,9 @@ from assignment.assignments import PDAssignment, EQSAssignment, EQFAssignment
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
+from examples.generator import unbalance
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import PriorityExtractor
+from gradient_descent.parameter_handlers import PriorityExtractor, MappingPriorityExtractor
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
@@ -25,6 +26,28 @@ def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
     gradient_function = VectorFPGradientFunction(PrioritiesMatrix())
 
     update_function = NoisyAdam()
+    optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
+                                        cost_function=cost_function,
+                                        stop_function=stop_function,
+                                        gradient_function=gradient_function,
+                                        update_function=update_function,
+                                        verbose=False)
+
+    pd = PDAssignment(normalize=True)
+    pd.apply(system)
+    optimizer.apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
+
+
+def gdpa_pd_fp_mapping_vector(system: LinearSystem) -> bool:
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
+    parameter_handler = MappingPriorityExtractor()
+    cost_function = InvslackCost(param_handler=parameter_handler, analysis=analysis)
+    stop_function = ThresholdStopFunction(limit=100)
+    gradient_function = VectorFPGradientFunction(PrioritiesMatrix(), sigma=1.5)
+
+    update_function = NoisyAdam(lr=1.5, beta1=0.9, beta2=0.999, epsilon=0.1, gamma=0.5)
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                         cost_function=cost_function,
                                         stop_function=stop_function,
@@ -76,7 +99,7 @@ if __name__ == '__main__':
     rnd = Random(42)
     size = (3, 4, 3)  # flows, tasks, procs
     n = 50
-    systems = [get_system(size, rnd, balanced=True, name=str(i),
+    systems = [get_system(size, rnd, balanced=False, name=str(i),
                           deadline_factor_min=0.5,
                           deadline_factor_max=1) for i in range(n)]
 
@@ -84,14 +107,14 @@ if __name__ == '__main__':
     utilizations = np.linspace(0.5, 0.9, 20)
 
     tools = [
+        ("gdpa-mapping", gdpa_pd_fp_mapping_vector),
         ("gdpa", gdpa_pd_fp_vector),
         ("hopa", hopa_fp),
-        ("pd", pd_fp),
-        ("eqs", eqs_fp),
-        ("eqf", eqf_fp)
+        ("pd", pd_fp)
     ]
 
     labels, funcs = zip(*tools)
-    runner = SchedRatioEval("gradient_fp_validation", labels=labels, funcs=funcs,
+    runner = SchedRatioEval("gradient_fp_mapping_validation", labels=labels, funcs=funcs,
+                            preprocessor=unbalance,
                             systems=systems, utilizations=utilizations, threads=8)
     runner.run()

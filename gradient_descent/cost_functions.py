@@ -5,16 +5,16 @@ from model.analysis_function import AnalysisFunction
 
 
 class InvslackCost(CostFunction):
-    def __init__(self, param_handler: ParameterHandler, analysis: AnalysisFunction):
-        self.param_handler = param_handler
+    def __init__(self, parameter_handler: ParameterHandler, analysis: AnalysisFunction):
+        self.parameter_handler = parameter_handler
         self.analysis = analysis
 
     def reset(self):
-        self.param_handler.reset()
+        self.parameter_handler.reset()
 
     def compute(self, S: LinearSystem, x: [float]) -> float:
         a = backup_assignment(S)
-        self.param_handler.insert(S, x)
+        self.parameter_handler.insert(S, x)
         self.analysis.apply(S)
         cost = max([(flow.wcrt - flow.deadline) / flow.deadline for flow in S.flows])
         restore_assignment(S, a)

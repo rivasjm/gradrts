@@ -4,8 +4,8 @@ from model.system_model import SystemModel
 
 
 class SequentialGradientFunction(GradientFunction):
-    def __init__(self, cost_function: CostFunction, lambda_factor=1.5):
-        self.delta_function = AvgSeparationDelta(factor=lambda_factor)
+    def __init__(self, cost_function: CostFunction, sigma=1.5):
+        self.delta_function = AvgSeparationDelta(sigma=sigma)
         self.cost_function = cost_function
 
     def reset(self):
@@ -21,12 +21,12 @@ class SequentialGradientFunction(GradientFunction):
 
 
 class AvgSeparationDelta(Function):
-    def __init__(self, factor=1.5):
-        self.factor = factor
+    def __init__(self, sigma=1.5):
+        self.sigma = sigma
 
     def apply(self, S: SystemModel, x: [float]) -> [float]:
         seps = [abs(x[i + 1] - x[i]) for i in range(len(x) - 1)]
-        return [self.factor * sum(seps) / len(seps)]*len(x)
+        return [self.sigma * sum(seps) / len(seps)]*len(x)
 
 
 def gradient_inputs_from_deltas(x, deltas) -> [[float]]:
@@ -39,6 +39,7 @@ def gradient_inputs_from_deltas(x, deltas) -> [[float]]:
         vector[i] -= deltas[i]
         ret.append(vector)
     return ret
+
 
 def gradient_from_costs(costs, deltas) -> [float]:
     gradient = [0] * int(len(costs) / 2)
