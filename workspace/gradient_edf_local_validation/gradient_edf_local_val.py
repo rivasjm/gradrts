@@ -4,6 +4,7 @@ import numpy as np
 
 from analysis.holistic_local_edf_analysis import HolisticLocalEDFAnalysis
 from assignment.assignments import PDAssignment, EQFAssignment
+from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
@@ -22,11 +23,16 @@ def item(system, assignment, test):
 
 
 def edf_local_pd(system: LinearSystem) -> bool:
-    return item(system, PDAssignment(), HolisticLocalEDFAnalysis(limit_factor=10, reset=False))
+    return item(system, PDAssignment(), HolisticLocalEDFAnalysis(limit_factor=1, reset=True))
 
 
 def edf_local_eqf(system: LinearSystem) -> bool:
-    return item(system,  EQFAssignment(), HolisticLocalEDFAnalysis(limit_factor=10, reset=False))
+    return item(system,  EQFAssignment(), HolisticLocalEDFAnalysis(limit_factor=1, reset=True))
+
+
+def edf_local_hopa(system: LinearSystem) -> bool:
+    analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
+    return item(system, HOPAssignment(analysis=analysis), HolisticLocalEDFAnalysis(limit_factor=1, reset=True))
 
 
 def edf_local_gdpa(system: LinearSystem) -> bool:
@@ -61,6 +67,7 @@ if __name__ == '__main__':
 
     tools = [("EDF-L PD", edf_local_pd),
              ("EDF-L EQF", edf_local_eqf),
+             ("EDF-L HOPA", edf_local_hopa),
              ("EDF-L GDPA", edf_local_gdpa)]
 
     labels, funcs = zip(*tools)
