@@ -63,7 +63,6 @@ def gdpa_pd_fp_mapping_vector(system: LinearSystem) -> bool:
 
 
 def pd_fp(system: LinearSystem) -> bool:
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     pd = PDAssignment(normalize=True)
     pd.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
@@ -71,7 +70,6 @@ def pd_fp(system: LinearSystem) -> bool:
 
 
 def eqs_fp(system: LinearSystem) -> bool:
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     eqs = EQSAssignment()
     eqs.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
@@ -79,7 +77,6 @@ def eqs_fp(system: LinearSystem) -> bool:
 
 
 def eqf_fp(system: LinearSystem) -> bool:
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     eqf = EQFAssignment()
     eqf.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
@@ -110,6 +107,8 @@ if __name__ == '__main__':
         ("gdpa-mapping", gdpa_pd_fp_mapping_vector),
         ("gdpa", gdpa_pd_fp_vector),
         ("hopa", hopa_fp),
+        ("eqs", eqs_fp),
+        ("eqf", eqf_fp),
         ("pd", pd_fp)
     ]
 
