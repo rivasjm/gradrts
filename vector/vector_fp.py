@@ -57,9 +57,9 @@ class PriorityScenarios:
 
 
 class VectorFPGradientFunction(GradientFunction):
-    def __init__(self, vector_matrix: PriorityScenarios, sigma=1.5):
+    def __init__(self, sigma=1.5):
         self.delta_function = AvgSeparationDelta(sigma=sigma)
-        self.vector_matrix = vector_matrix
+        self.vector_matrix = PrioritiesMatrix()
         self.cache = ResultsCache()
 
     def reset(self):

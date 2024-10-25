@@ -21,9 +21,9 @@ from vector.vector_fp import VectorFPGradientFunction, PrioritiesMatrix
 def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     parameter_handler = PriorityExtractor()
-    cost_function = InvslackCost(param_handler=parameter_handler, analysis=analysis)
+    cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction(PrioritiesMatrix())
+    gradient_function = VectorFPGradientFunction()
 
     update_function = NoisyAdam()
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
@@ -45,7 +45,7 @@ def gdpa_pd_fp_mapping_vector(system: LinearSystem) -> bool:
     parameter_handler = MappingPriorityExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction(PrioritiesMatrix(), sigma=1.5)
+    gradient_function = VectorFPGradientFunction(sigma=1.5)
 
     update_function = NoisyAdam(lr=1.5, beta1=0.9, beta2=0.999, epsilon=0.1, gamma=0.5)
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
