@@ -15,7 +15,7 @@ from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
-from vector.vector_fp import VectorFPGradientFunction, PrioritiesMatrix
+from vector.vector_fp import VectorFPGradientFunction, PrioritiesMatrix, MappingPrioritiesMatrix
 
 
 def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
@@ -23,7 +23,7 @@ def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
     parameter_handler = PriorityExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction()
+    gradient_function = VectorFPGradientFunction(scenarios_builder=PrioritiesMatrix())
 
     update_function = NoisyAdam()
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
@@ -45,7 +45,7 @@ def gdpa_pd_fp_mapping_vector(system: LinearSystem) -> bool:
     parameter_handler = MappingPriorityExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction(sigma=1.5)
+    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(), sigma=1.5)
 
     update_function = NoisyAdam(lr=1.5, beta1=0.9, beta2=0.999, epsilon=0.1, gamma=0.5)
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
@@ -105,11 +105,11 @@ if __name__ == '__main__':
 
     tools = [
         ("gdpa-mapping", gdpa_pd_fp_mapping_vector),
-        ("gdpa", gdpa_pd_fp_vector),
-        ("hopa", hopa_fp),
-        ("eqs", eqs_fp),
-        ("eqf", eqf_fp),
-        ("pd", pd_fp)
+        # ("gdpa", gdpa_pd_fp_vector),
+        # ("hopa", hopa_fp),
+        # ("eqs", eqs_fp),
+        # ("eqf", eqf_fp),
+        # ("pd", pd_fp)
     ]
 
     labels, funcs = zip(*tools)

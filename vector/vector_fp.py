@@ -57,9 +57,9 @@ class PriorityScenarios:
 
 
 class VectorFPGradientFunction(GradientFunction):
-    def __init__(self, sigma=1.5):
+    def __init__(self, scenarios_builder: PriorityScenarios, sigma=1.5):
         self.delta_function = AvgSeparationDelta(sigma=sigma)
-        self.vector_matrix = PrioritiesMatrix()
+        self.scenarios_builder = scenarios_builder
         self.cache = ResultsCache()
 
     def reset(self):
@@ -68,7 +68,7 @@ class VectorFPGradientFunction(GradientFunction):
     def _compute_costs(self, system: LinearSystem, inputs: [[float]]) -> np.array:
         tasks = system.tasks
         n = len(tasks)
-        priority_matrices = self.vector_matrix.apply(system, inputs)
+        priority_matrices = self.scenarios_builder.apply(system, inputs)
         deadlines = np.array([task.flow.deadline for task in tasks]).reshape(n, 1)
         vholistic = VectorHolisticFPAnalysis(limit_factor=10, verbose=False, cache=self.cache)
         vholistic.apply(system, scenarios=priority_matrices)

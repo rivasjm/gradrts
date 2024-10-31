@@ -358,7 +358,7 @@ class Task:
 
     def __repr__(self) -> str:
         """Returns a string representation of the task."""
-        return f"{self.name} ({self.processor.name if self.processor else None},{self.wcet:.2f})"
+        return f"{self.processor.name if self.processor else None}({self.utilization:.2f})"
 
     @property
     def utilization(self) -> float:
