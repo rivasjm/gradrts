@@ -10,6 +10,10 @@ import time
 from datetime import datetime
 from model.linear_system_utils import backup_assignment, restore_assignment
 
+# ANSI escape codes for colors
+RED = '\033[91m'
+RESET = '\033[0m'
+
 class SchedRatioEval:
     """Class to perform a Schedulability Ratio evaluation over a utilization series"""
     def __init__(self, name, labels, funcs, systems, utilizations, threads,
@@ -57,16 +61,22 @@ class SchedRatioEval:
         times = np.zeros(len(self.funcs), dtype=np.single)
         a = backup_assignment(system)
         for f, func in enumerate(self.funcs):
-            if self.preprocessor:
-                self.preprocessor(system)
-            reset_wcrt(system)
-            before = time.perf_counter()
-            sched = func(system)
-            after = time.perf_counter()
-            restore_assignment(system, a)
-            if sched:
-                results[f] = 1
-            times[f] = after - before
+            try:
+                if self.preprocessor:
+                    self.preprocessor(system)
+                reset_wcrt(system)
+                before = time.perf_counter()
+                sched = func(system)
+                after = time.perf_counter()
+                restore_assignment(system, a)
+                if sched:
+                    results[f] = 1
+                times[f] = after - before
+            except Exception as e:
+                print(f"{RED}Error in {self.labels[f]}, system={system.name}\n{e}{RESET}")
+                restore_assignment(system, a)
+                results[f] = 0
+                times[f] = 0
         return results, times
 
     def _save(self, data, suffix, show=True):
