@@ -105,11 +105,11 @@ if __name__ == '__main__':
 
     tools = [
         ("gdpa-mapping", gdpa_pd_fp_mapping_vector),
-        # ("gdpa", gdpa_pd_fp_vector),
+        ("gdpa", gdpa_pd_fp_vector),
         # ("hopa", hopa_fp),
         # ("eqs", eqs_fp),
         # ("eqf", eqf_fp),
-        # ("pd", pd_fp)
+        ("pd", pd_fp)
     ]
 
     labels, funcs = zip(*tools)
