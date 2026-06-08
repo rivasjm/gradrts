@@ -101,7 +101,7 @@ class MappingPrioritiesMatrix(PriorityScenarios):
             mapping = np.array([proc(x[t*p:t*p+p]) for t in range(n)]).reshape(-1, 1)
             priorities = np.array(x[-n:]).reshape(-1, 1)
             temp = (priorities < priorities.T) * (mapping == mapping.T)
-            pm[i::] = temp
+            pm[i] = temp
         return pm
 
 
@@ -114,7 +114,7 @@ class PrioritiesMatrix(PriorityScenarios):
         for i, x in enumerate(inputs):
             priorities = np.array(x[-n:]).reshape(-1, 1)
             temp = (priorities < priorities.T) * (mapping == mapping.T)
-            pm[i::] = temp
+            pm[i] = temp
         return pm
 
 
