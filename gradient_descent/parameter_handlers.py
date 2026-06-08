@@ -51,7 +51,7 @@ class MappingPriorityExtractor(ParameterHandler):
 
         # parse mapping values (fist p*t values)
         for i in range(t):
-            sub = x[i*p: i*p+3]
+            sub = x[i*p: (i+1)*p]
             proc_index = sub.index(max(sub))
             tasks[i].processor = procs[proc_index]
 
@@ -80,7 +80,7 @@ class MappingDeadlineExtractor(ParameterHandler):
 
         # parse mapping values (fist p*t values)
         for i in range(t):
-            sub = x[i*p: i*p+3]
+            sub = x[i*p: (i+1)*p]
             proc_index = sub.index(max(sub))
             tasks[i].processor = procs[proc_index]
 
