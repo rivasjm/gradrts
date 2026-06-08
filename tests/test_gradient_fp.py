@@ -28,7 +28,7 @@ if __name__ == '__main__':
 def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     parameter_handler = PriorityExtractor()
-    cost_function = InvslackCost(param_handler=parameter_handler, analysis=analysis)
+    cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
     gradient_function = VectorFPGradientFunction(PrioritiesMatrix())
 
