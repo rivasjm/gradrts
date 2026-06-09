@@ -88,5 +88,22 @@ class MappingDeadlineExtractor(ParameterHandler):
         self.deadline_extractor.insert(S, x[-t:])
 
 
+class MappingOnlyExtractor(ParameterHandler):
+    def extract(self, S: LinearSystem) -> [float]:
+        return [0.55 if task.processor == proc else 0.45
+                for task in S.tasks for proc in S.processors]
+
+    def insert(self, S: LinearSystem, x: [float]) -> None:
+        tasks = S.tasks
+        procs = S.processors
+        p = len(procs)
+        t = len(tasks)
+        assert len(x) == p * t
+        for i in range(t):
+            sub = x[i * p: (i + 1) * p]
+            proc_index = sub.index(max(sub))
+            tasks[i].processor = procs[proc_index]
+
+
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))

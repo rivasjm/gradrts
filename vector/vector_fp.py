@@ -105,6 +105,19 @@ class MappingPrioritiesMatrix(PriorityScenarios):
         return pm
 
 
+class MappingOnlyMatrix(PriorityScenarios):
+    def apply(self, S: LinearSystem, inputs: [[float]]) -> np.ndarray:
+        p = len(S.processors)
+        n = len(S.tasks)
+        pm = np.zeros((len(inputs), n, n))
+        priorities = np.array([task.priority for task in S.tasks]).reshape(-1, 1)
+        for i, x in enumerate(inputs):
+            mapping = np.array([proc(x[t * p:t * p + p]) for t in range(n)]).reshape(-1, 1)
+            temp = (priorities < priorities.T) * (mapping == mapping.T)
+            pm[i] = temp
+        return pm
+
+
 class PrioritiesMatrix(PriorityScenarios):
     def apply(self, S: LinearSystem, inputs: [[float]]) -> np.ndarray:
         n = len(S.tasks)

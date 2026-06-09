@@ -8,6 +8,7 @@ from collections import defaultdict
 FP_EXCEL = "./fp/gradient_fp_validation_schedulables.xlsx"
 EDF_LOCAL_EXCEL = "./edf-local/gradient_edf_local_validation_schedulables.xlsx"
 FP_MAPPING_EXCEL = "./fp-mapping/gradient_fp_mapping_validation_schedulables.xlsx"
+FP_MAPPING_ONLY_EXCEL = "./fp-mapping-only/gradient_fp_mapping_only_validation_schedulables.xlsx"
 
 
 # def add_text(ax, posx, posy, label, size='small', align='center'):
@@ -64,8 +65,28 @@ def plot_schedulables():
     fig.savefig("schedulables.png")
 
 
+def plot_mapping_only_schedulables():
+    mapping_only = pd.read_excel(FP_MAPPING_ONLY_EXCEL, index_col=0)
+    mapping_only = mapping_only[['gdpa-mapping', 'bf-mapping']]
+    mapping_only.rename(columns={'gdpa-mapping': 'gdpa+map', 'bf-mapping': 'bf-map'}, inplace=True)
+
+    fig, ax = plt.subplots(constrained_layout=True, figsize=(5, 3))
+    styles = ['+-', 'o-', 'x--', 's:', '*-']
+    mapping_only.plot.line(ax=ax, style=styles)
+    ax.set_ylabel("Schedulable Systems", fontweight='bold')
+    ax.set_xlabel("Average Utilization", fontweight='bold')
+    ax.grid(True, which='major', axis='x')
+    ax.legend(loc='lower left', ncol=2, columnspacing=0.5, prop={'weight': 'bold', 'size': 9})
+    ax.text(0.95, 0.95, "MAP-ONLY", ha='right', va='top', transform=ax.transAxes,
+            fontweight='bold', bbox=dict(boxstyle="round", ec='black', fc='bisque'))
+
+    fig.savefig("mapping-only-schedulables.pdf")
+    fig.savefig("mapping-only-schedulables.png")
+
+
 def main():
     plot_schedulables()
+    plot_mapping_only_schedulables()
 
 
 if __name__ == '__main__':
