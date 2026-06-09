@@ -24,9 +24,6 @@ class BruteForceFPAssignment(AnalysisFunction):
         self.schedulable = False
         self.iterations_to_sched = -1
 
-        pd = PDAssignment(normalize=True)
-        pd.apply(system)
-
         tasks = system.tasks
         procs = system.processors
 
@@ -93,7 +90,7 @@ class BruteForceFPAssignment(AnalysisFunction):
         mapping = mapping.reshape(1, n, 1)
 
         priorities = scenarios.T.reshape(s, n, 1)
-        pm = (priorities.transpose(0, 2, 1) > priorities) & \
+        pm = (priorities.transpose(0, 2, 1) >= priorities) & \
              (mapping == mapping.transpose(0, 2, 1)) & \
              ~np.eye(n, dtype=np.bool_).reshape(1, n, n)
         return pm.astype(np.float32)
@@ -210,8 +207,8 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
         mapping = np.array(mapping_tuple, dtype=np.int32).reshape(n, 1)
         prio = np.array(priorities, dtype=np.float32).reshape(n, 1)
         same_proc = mapping == mapping.T
-        higher = prio.T > prio
-        pm = (same_proc & higher).astype(np.float32)
+        higher = prio.T >= prio
+        pm = (same_proc & higher & ~np.eye(n, dtype=np.bool_)).astype(np.float32)
         return pm
 
     @staticmethod
@@ -220,3 +217,80 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
         for task, proc_idx, prio in zip(system.tasks, mapping_tuple, priorities_tuple):
             task.processor = procs[proc_idx]
             task.priority = float(prio)
+
+
+class BruteForceMappingAssignment(AnalysisFunction):
+    def __init__(self, batch_size=10000, verbose=False):
+        self.batch_size = batch_size if batch_size > 0 else 1
+        self.verbose = verbose
+        self.analysis = VectorHolisticFPAnalysis(limit_factor=10)
+        self.schedulable = False
+        self.exec_time = ExecTime()
+        self.iterations_to_sched = -1
+        self.space_size = 0
+
+    def apply(self, system: LinearSystem) -> LinearSystem:
+        self.exec_time.init()
+        self.schedulable = False
+        self.iterations_to_sched = -1
+
+        tasks = system.tasks
+        n = len(tasks)
+        procs = system.processors
+        pi = len(procs)
+
+        priorities = [t.priority for t in tasks]
+
+        mapping_space = list(itertools.product(range(pi), repeat=n))
+        self.space_size = len(mapping_space)
+
+        pm_batch = []
+        mappings_batch = []
+        processed = 0
+
+        for mapping_tuple in mapping_space:
+            pm = BruteForceFPMappingAssignment._single_priority_matrix(
+                mapping_tuple, priorities, n)
+            pm_batch.append(pm)
+            mappings_batch.append(mapping_tuple)
+
+            if len(pm_batch) == self.batch_size:
+                processed += len(pm_batch)
+                if self.verbose:
+                    print(f"Processed {processed}/{self.space_size} "
+                          f"({processed / self.space_size * 100:.3f}%)")
+                if self._process_batch(system, pm_batch, mappings_batch):
+                    self.iterations_to_sched = processed
+                    if self.verbose:
+                        print("Schedulable solution found")
+                    self.exec_time.stop()
+                    return system
+                pm_batch.clear()
+                mappings_batch.clear()
+
+        if len(pm_batch) > 0 and not self.schedulable:
+            if self._process_batch(system, pm_batch, mappings_batch):
+                self.iterations_to_sched = processed + len(pm_batch)
+                if self.verbose:
+                    print("Schedulable solution found")
+
+        self.exec_time.stop()
+        return system
+
+    def _process_batch(self, system, pm_batch, mappings_batch):
+        pm = np.stack(pm_batch, axis=0)
+        self.analysis.apply(system, scenarios=pm)
+        r = self.analysis.scenarios_response_times
+        n = len(system.tasks)
+        deadlines = np.array([task.flow.deadline for task in system.tasks]).reshape(n, 1)
+        slacks = deadlines - r
+        schedulables = np.all(slacks >= 0, axis=0)
+        if np.any(schedulables):
+            index = np.argmax(schedulables)
+            mapping_tuple = mappings_batch[index]
+            procs = system.processors
+            for task, proc_idx in zip(system.tasks, mapping_tuple):
+                task.processor = procs[proc_idx]
+            self.schedulable = True
+            return True
+        return False
