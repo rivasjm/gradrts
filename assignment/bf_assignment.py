@@ -239,27 +239,48 @@ class BruteForceMappingAssignment(AnalysisFunction):
         procs = system.processors
         pi = len(procs)
 
-        priorities = [t.priority for t in tasks]
-
         mapping_space = list(itertools.product(range(pi), repeat=n))
         self.space_size = len(mapping_space)
 
         pm_batch = []
         mappings_batch = []
+        priorities_batch = []
         processed = 0
 
         for mapping_tuple in mapping_space:
+            # Group task indices by processor index under this candidate mapping
+            proc_tasks = [[] for _ in range(pi)]
+            for task_idx, proc_idx in enumerate(mapping_tuple):
+                proc_tasks[proc_idx].append(task_idx)
+
+            # Assign Deadline Monotonic priorities (with index as tie-breaker)
+            candidate_priorities = [0.0] * n
+            for proc_idx in range(pi):
+                sorted_indices = sorted(
+                    proc_tasks[proc_idx],
+                    key=lambda idx: (tasks[idx].deadline if tasks[idx].deadline is not None else 0.0, idx),
+                    reverse=True
+                )
+                for prio_val, idx in enumerate(sorted_indices, start=1):
+                    candidate_priorities[idx] = float(prio_val)
+
+            # Normalize priorities
+            max_prio = max(candidate_priorities) if candidate_priorities else 1.0
+            if max_prio > 0:
+                candidate_priorities = [p / max_prio for p in candidate_priorities]
+
             pm = BruteForceFPMappingAssignment._single_priority_matrix(
-                mapping_tuple, priorities, n)
+                mapping_tuple, candidate_priorities, n)
             pm_batch.append(pm)
             mappings_batch.append(mapping_tuple)
+            priorities_batch.append(candidate_priorities)
 
             if len(pm_batch) == self.batch_size:
                 processed += len(pm_batch)
                 if self.verbose:
                     print(f"Processed {processed}/{self.space_size} "
                           f"({processed / self.space_size * 100:.3f}%)")
-                if self._process_batch(system, pm_batch, mappings_batch):
+                if self._process_batch(system, pm_batch, mappings_batch, priorities_batch):
                     self.iterations_to_sched = processed
                     if self.verbose:
                         print("Schedulable solution found")
@@ -267,9 +288,10 @@ class BruteForceMappingAssignment(AnalysisFunction):
                     return system
                 pm_batch.clear()
                 mappings_batch.clear()
+                priorities_batch.clear()
 
         if len(pm_batch) > 0 and not self.schedulable:
-            if self._process_batch(system, pm_batch, mappings_batch):
+            if self._process_batch(system, pm_batch, mappings_batch, priorities_batch):
                 self.iterations_to_sched = processed + len(pm_batch)
                 if self.verbose:
                     print("Schedulable solution found")
@@ -277,7 +299,7 @@ class BruteForceMappingAssignment(AnalysisFunction):
         self.exec_time.stop()
         return system
 
-    def _process_batch(self, system, pm_batch, mappings_batch):
+    def _process_batch(self, system, pm_batch, mappings_batch, priorities_batch):
         pm = np.stack(pm_batch, axis=0)
         self.analysis.apply(system, scenarios=pm)
         r = self.analysis.scenarios_response_times
@@ -288,9 +310,11 @@ class BruteForceMappingAssignment(AnalysisFunction):
         if np.any(schedulables):
             index = np.argmax(schedulables)
             mapping_tuple = mappings_batch[index]
+            priorities_tuple = priorities_batch[index]
             procs = system.processors
-            for task, proc_idx in zip(system.tasks, mapping_tuple):
+            for task, proc_idx, prio in zip(system.tasks, mapping_tuple, priorities_tuple):
                 task.processor = procs[proc_idx]
+                task.priority = prio
             self.schedulable = True
             return True
         return False
