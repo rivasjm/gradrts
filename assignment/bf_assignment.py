@@ -9,7 +9,7 @@ from utils.exec_time import ExecTime
 from vector.vector_fp import VectorHolisticFPAnalysis
 
 
-class BruteForceAssignment(AnalysisFunction):
+class BruteForceFPAssignment(AnalysisFunction):
     def __init__(self, batch_size=10000, verbose=False):
         self.batch_size = batch_size if batch_size > 0 else 1
         self.verbose = verbose
@@ -111,3 +111,112 @@ class BruteForceAssignment(AnalysisFunction):
     @staticmethod
     def _flatten(lst):
         return [x for sublist in lst for x in sublist]
+
+
+class BruteForceFPMappingAssignment(AnalysisFunction):
+    def __init__(self, batch_size=10000, verbose=False):
+        self.batch_size = batch_size if batch_size > 0 else 1
+        self.verbose = verbose
+        self.analysis = VectorHolisticFPAnalysis(limit_factor=10)
+        self.schedulable = False
+        self.exec_time = ExecTime()
+        self.iterations_to_sched = -1
+        self.space_size = 0
+
+    def apply(self, system: LinearSystem) -> LinearSystem:
+        self.exec_time.init()
+        self.schedulable = False
+        self.iterations_to_sched = -1
+
+        PDAssignment(normalize=True).apply(system)
+
+        tasks = system.tasks
+        n = len(tasks)
+        procs = system.processors
+        pi = len(procs)
+
+        mapping_space = list(itertools.product(range(pi), repeat=n))
+        perms_per_mapping = []
+        for mapping in mapping_space:
+            proc_counts = [mapping.count(p) for p in range(pi)]
+            perms = math.prod([math.factorial(c) for c in proc_counts])
+            perms_per_mapping.append(perms)
+
+        self.space_size = sum(perms_per_mapping)
+
+        pm_batch = []
+        solutions_batch = []
+        processed = 0
+
+        for mapping_tuple, n_perms in zip(mapping_space, perms_per_mapping):
+            proc_task_indices = [[] for _ in range(pi)]
+            for task_idx, proc in enumerate(mapping_tuple):
+                proc_task_indices[proc].append(task_idx)
+
+            prio_perms = [list(itertools.permutations(range(1, len(pt) + 1)))
+                          for pt in proc_task_indices]
+
+            for prio_combo in itertools.product(*prio_perms):
+                priorities = [0] * n
+                for proc_idx, perm in enumerate(prio_combo):
+                    for task_idx, prio_val in zip(proc_task_indices[proc_idx], perm):
+                        priorities[task_idx] = prio_val
+
+                pm = self._single_priority_matrix(mapping_tuple, priorities, n)
+                pm_batch.append(pm)
+                solutions_batch.append((mapping_tuple, tuple(priorities)))
+
+                if len(pm_batch) == self.batch_size:
+                    processed += len(pm_batch)
+                    if self.verbose:
+                        print(f"Processed {processed}/{self.space_size} "
+                              f"({processed / self.space_size * 100:.3f}%)")
+                    if self._process_batch(system, pm_batch, solutions_batch):
+                        self.iterations_to_sched = processed
+                        if self.verbose:
+                            print("Schedulable solution found")
+                        self.exec_time.stop()
+                        return system
+                    pm_batch.clear()
+                    solutions_batch.clear()
+
+        if len(pm_batch) > 0 and not self.schedulable:
+            if self._process_batch(system, pm_batch, solutions_batch):
+                self.iterations_to_sched = processed + len(pm_batch)
+                if self.verbose:
+                    print("Schedulable solution found")
+
+        self.exec_time.stop()
+        return system
+
+    def _process_batch(self, system, pm_batch, solutions_batch):
+        pm = np.stack(pm_batch, axis=0)
+        self.analysis.apply(system, scenarios=pm)
+        r = self.analysis.scenarios_response_times
+        n = len(system.tasks)
+        deadlines = np.array([task.flow.deadline for task in system.tasks]).reshape(n, 1)
+        slacks = deadlines - r
+        schedulables = np.all(slacks >= 0, axis=0)
+        if np.any(schedulables):
+            index = np.argmax(schedulables)
+            mapping_tuple, priorities_tuple = solutions_batch[index]
+            self._apply_solution(system, mapping_tuple, priorities_tuple)
+            self.schedulable = True
+            return True
+        return False
+
+    @staticmethod
+    def _single_priority_matrix(mapping_tuple, priorities, n):
+        mapping = np.array(mapping_tuple, dtype=np.int32).reshape(n, 1)
+        prio = np.array(priorities, dtype=np.float32).reshape(n, 1)
+        same_proc = mapping == mapping.T
+        higher = prio.T > prio
+        pm = (same_proc & higher).astype(np.float32)
+        return pm
+
+    @staticmethod
+    def _apply_solution(system, mapping_tuple, priorities_tuple):
+        procs = system.processors
+        for task, proc_idx, prio in zip(system.tasks, mapping_tuple, priorities_tuple):
+            task.processor = procs[proc_idx]
+            task.priority = float(prio)

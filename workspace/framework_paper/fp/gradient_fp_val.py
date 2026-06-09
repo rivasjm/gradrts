@@ -7,7 +7,7 @@ from random import Random
 from functools import partial
 
 from assignment.assignments import PDAssignment, EQSAssignment, EQFAssignment
-from assignment.bf_assignment import BruteForceAssignment
+from assignment.bf_assignment import BruteForceFPAssignment
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
@@ -75,7 +75,7 @@ def hopa_fp(system: LinearSystem) -> bool:
 
 
 def bf_fp(system: LinearSystem) -> bool:
-    bf = BruteForceAssignment(batch_size=10000)
+    bf = BruteForceFPAssignment(batch_size=10000)
     bf.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
