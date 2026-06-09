@@ -5,9 +5,9 @@ import matplotlib.ticker as ticker
 import openpyxl
 from collections import defaultdict
 
-FP_EXCEL = "../gradient_fp_validation/gradient_fp_validation_schedulables.xlsx"
-EDF_LOCAL_EXCEL = "../gradient_edf_local_validation/gradient_edf_local_validation_schedulables.xlsx"
-FP_MAPPING_EXCEL = "../gradient_fp_mapping_validation/gradient_fp_mapping_validation_schedulables.xlsx"
+FP_EXCEL = "./fp/gradient_fp_validation_schedulables.xlsx"
+EDF_LOCAL_EXCEL = "./edf-local/gradient_edf_local_validation_schedulables.xlsx"
+FP_MAPPING_EXCEL = "./fp-mapping/gradient_fp_mapping_validation_schedulables.xlsx"
 
 
 # def add_text(ax, posx, posy, label, size='small', align='center'):
