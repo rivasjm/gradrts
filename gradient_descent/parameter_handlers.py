@@ -104,6 +104,10 @@ class MappingOnlyExtractor(ParameterHandler):
             proc_index = sub.index(max(sub))
             tasks[i].processor = procs[proc_index]
 
+        from model.analysis_function import calculate_priorities, normalize_priorities
+        calculate_priorities(S)
+        normalize_priorities(S)
+
 
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))

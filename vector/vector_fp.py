@@ -110,10 +110,36 @@ class MappingOnlyMatrix(PriorityScenarios):
         p = len(S.processors)
         n = len(S.tasks)
         pm = np.zeros((len(inputs), n, n))
-        priorities = np.array([task.priority for task in S.tasks]).reshape(-1, 1)
+        tasks = S.tasks
         for i, x in enumerate(inputs):
-            mapping = np.array([proc(x[t * p:t * p + p]) for t in range(n)]).reshape(-1, 1)
-            temp = (priorities < priorities.T) * (mapping == mapping.T)
+            # Determine discrete mapping for this candidate input x
+            mapping_tuple = tuple(proc(x[t * p:t * p + p]) - 1 for t in range(n))
+
+            # Group task indices by processor index under this candidate mapping
+            proc_tasks = [[] for _ in range(p)]
+            for task_idx, proc_idx in enumerate(mapping_tuple):
+                proc_tasks[proc_idx].append(task_idx)
+
+            # Assign local Deadline Monotonic priorities (with index as tie-breaker)
+            candidate_priorities = [0.0] * n
+            for proc_idx in range(p):
+                sorted_indices = sorted(
+                    proc_tasks[proc_idx],
+                    key=lambda idx: (tasks[idx].deadline if tasks[idx].deadline is not None else 0.0, idx),
+                    reverse=True
+                )
+                for prio_val, idx in enumerate(sorted_indices, start=1):
+                    candidate_priorities[idx] = float(prio_val)
+
+            # Normalize priorities
+            max_prio = max(candidate_priorities) if candidate_priorities else 1.0
+            if max_prio > 0:
+                candidate_priorities = [prio / max_prio for prio in candidate_priorities]
+
+            # Construct priority interference matrix
+            mapping = np.array(mapping_tuple).reshape(-1, 1)
+            prio = np.array(candidate_priorities).reshape(-1, 1)
+            temp = (prio < prio.T) * (mapping == mapping.T)
             pm[i] = temp
         return pm
 
