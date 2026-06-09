@@ -7,6 +7,7 @@ from functools import partial
 import matplotlib.pyplot as plt
 import pandas as pd
 import time
+import os
 from datetime import datetime
 from model.linear_system_utils import backup_assignment, restore_assignment
 
@@ -17,7 +18,8 @@ RESET = '\033[0m'
 class SchedRatioEval:
     """Class to perform a Schedulability Ratio evaluation over a utilization series"""
     def __init__(self, name, labels, funcs, systems, utilizations, threads,
-                 preprocessor=None, utilization_func=set_utilization):
+                 preprocessor=None, utilization_func=set_utilization,
+                 output_dir=None):
         assert len(labels) == len(funcs)
         self.name = name                    # name of the study. used to name output files
         self.labels = labels                # label for each function (same length as funcs)
@@ -28,6 +30,7 @@ class SchedRatioEval:
         self.preprocessor = preprocessor    # function to pre-process system before analyzing it (optional)
         self.utilization_func = utilization_func  # function to set the system utilization
         self.start = None                   # starting time
+        self.output_dir = output_dir or os.getcwd()
 
     def run(self):
         self.start = time.time()
@@ -87,6 +90,9 @@ class SchedRatioEval:
         self._bar_chart(label, data, ylabel=suffix, save=True, show=length == 1 and show)
         self._excel(label, data)
 
+    def _path(self, filename):
+        return os.path.join(self.output_dir, filename)
+
     def _line_chart(self, label, data, ylabel, save=True, show=True):
         plt.clf()
         df = pd.DataFrame(data=data,
@@ -105,7 +111,7 @@ class SchedRatioEval:
         ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
         fig.tight_layout()
         if save:
-            fig.savefig(f"{label}.png")
+            fig.savefig(self._path(f"{label}.png"))
         if show:
             plt.show()
 
@@ -124,7 +130,7 @@ class SchedRatioEval:
         ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
         fig.tight_layout()
         if save:
-            fig.savefig(f"{label}_summary.png")
+            fig.savefig(self._path(f"{label}_summary.png"))
         if show:
             plt.show()
 
@@ -132,4 +138,4 @@ class SchedRatioEval:
         df = pd.DataFrame(data=data,
                           index=self.utilizations,
                           columns=self.labels)
-        df.to_excel(f"{label}.xlsx")
+        df.to_excel(self._path(f"{label}.xlsx"))

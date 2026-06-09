@@ -28,7 +28,7 @@ def plot_schedulables():
     edfl = pd.read_excel(EDF_LOCAL_EXCEL, index_col=0)
 
     # reorder and select columns
-    fp = fp[['gdpa', 'hopa', 'pd']]
+    fp = fp[['gdpa', 'hopa', 'pd', 'bf']]
     mapping = mapping[['gdpa-mapping', 'gdpa', 'pd']]
     edfl = edfl[['EDF-L GDPA', 'EDF-L HOPA', 'EDF-L PD']]
 

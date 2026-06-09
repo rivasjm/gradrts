@@ -1,10 +1,13 @@
+import argparse
 import numpy as np
+import os
 
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from random import Random
 from functools import partial
 
 from assignment.assignments import PDAssignment, EQSAssignment, EQFAssignment
+from assignment.bf_assignment import BruteForceAssignment
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
@@ -14,7 +17,7 @@ from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
-from vector.vector_fp import VectorFPGradientFunction
+from vector.vector_fp import VectorFPGradientFunction, PrioritiesMatrix
 
 
 def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
@@ -22,7 +25,7 @@ def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
     parameter_handler = PriorityExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction()
+    gradient_function = VectorFPGradientFunction(PrioritiesMatrix())
 
     update_function = NoisyAdam()
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
@@ -71,7 +74,19 @@ def hopa_fp(system: LinearSystem) -> bool:
     return system.is_schedulable()
 
 
+def bf_fp(system: LinearSystem) -> bool:
+    bf = BruteForceAssignment(batch_size=10000)
+    bf.apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
+
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Gradient FP validation")
+    parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
+                        help="Output directory for generated files (default: script directory)")
+    args = parser.parse_args()
+
     # create population of examples
     rnd = Random(42)
     size = (3, 4, 3)  # flows, tasks, procs
@@ -87,11 +102,13 @@ if __name__ == '__main__':
         ("gdpa", gdpa_pd_fp_vector),
         ("hopa", hopa_fp),
         ("pd", pd_fp),
+        ("bf", bf_fp),
         ("eqs", eqs_fp),
         ("eqf", eqf_fp)
     ]
 
     labels, funcs = zip(*tools)
     runner = SchedRatioEval("gradient_fp_validation", labels=labels, funcs=funcs,
-                            systems=systems, utilizations=utilizations, threads=8)
+                            systems=systems, utilizations=utilizations, threads=8,
+                            output_dir=args.output_dir)
     runner.run()
