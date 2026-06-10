@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     tools = [("EDF-L HOPA", edf_local_hopa),
              ("EDF-L GDPA", edf_local_gdpa),
-             ("EDF-L GDPA Mapping", edf_local_gdpa)]
+             ("EDF-L GDPA Mapping", edf_local_mapping_gdpa)]
 
     labels, funcs = zip(*tools)
     runner = SchedRatioEval("gradient_edf_local_mapping_validation", labels=labels, funcs=funcs,

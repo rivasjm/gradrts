@@ -239,6 +239,10 @@ class BruteForceMappingAssignment(AnalysisFunction):
         procs = system.processors
         pi = len(procs)
 
+        assert all(t.deadline is not None for t in tasks), \
+            "BruteForceMappingAssignment requires every task to have a deadline; " \
+            "apply PDAssignment (or EQS/EQF) before invoking this class"
+
         mapping_space = list(itertools.product(range(pi), repeat=n))
         self.space_size = len(mapping_space)
 
@@ -253,16 +257,19 @@ class BruteForceMappingAssignment(AnalysisFunction):
             for task_idx, proc_idx in enumerate(mapping_tuple):
                 proc_tasks[proc_idx].append(task_idx)
 
-            # Assign Deadline Monotonic priorities (with index as tie-breaker)
+            # Assign Deadline Monotonic priorities (with index as tie-breaker).
+            # Larger priority value = higher priority: shortest deadline gets the
+            # largest priority. task.deadline is expected to be populated by a
+            # prior PD assignment.
             candidate_priorities = [0.0] * n
             for proc_idx in range(pi):
                 sorted_indices = sorted(
                     proc_tasks[proc_idx],
-                    key=lambda idx: (tasks[idx].deadline if tasks[idx].deadline is not None else 0.0, idx),
-                    reverse=True
+                    key=lambda idx: (tasks[idx].deadline if tasks[idx].deadline is not None else math.inf, idx)
                 )
-                for prio_val, idx in enumerate(sorted_indices, start=1):
-                    candidate_priorities[idx] = float(prio_val)
+                k = len(sorted_indices)
+                for prio_pos, idx in enumerate(sorted_indices, start=1):
+                    candidate_priorities[idx] = float(k - prio_pos + 1)
 
             # Normalize priorities
             max_prio = max(candidate_priorities) if candidate_priorities else 1.0
