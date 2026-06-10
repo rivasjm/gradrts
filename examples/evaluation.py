@@ -11,6 +11,7 @@ import os
 from datetime import datetime
 from model.linear_system_utils import backup_assignment, restore_assignment
 
+
 # ANSI escape codes for colors
 RED = '\033[91m'
 RESET = '\033[0m'
@@ -75,6 +76,10 @@ class SchedRatioEval:
 
         for u_index, u in enumerate(self.utilizations):
             for s in self.systems:
+                # Apply preprocessor BEFORE setting utilization, so that utilization
+                # is set on the preprocessed system (e.g. unbalanced).
+                if self.preprocessor:
+                    self.preprocessor(s)
                 self.utilization_func(s, u)
 
             with Pool(self.threads) as pool:
@@ -99,8 +104,6 @@ class SchedRatioEval:
         a = backup_assignment(system)
         for f, func in enumerate(self.funcs):
             try:
-                if self.preprocessor:
-                    self.preprocessor(system)
                 reset_wcrt(system)
                 before = time.perf_counter()
                 sched = func(system)
@@ -140,7 +143,7 @@ class SchedRatioEval:
                 self._figs[label] = fig
             else:
                 ax = fig.axes[0]
-                ax.clear()
+            ax.clear()
             df.plot(ax=ax)
             ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
             time_label = f"{time.time() - self.start:.2f} seconds"
@@ -170,7 +173,7 @@ class SchedRatioEval:
                 self._figs[bar_label] = fig
             else:
                 ax = fig.axes[0]
-                ax.clear()
+            ax.clear()
             df.sum().plot.barh(ax=ax)
             ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
             time_label = f"{time.time() - self.start:.2f} seconds"

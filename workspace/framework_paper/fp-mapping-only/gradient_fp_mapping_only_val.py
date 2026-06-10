@@ -24,8 +24,8 @@ def gdpa_pd_fp_mapping_only_vector(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     parameter_handler = MappingOnlyExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
-    stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingOnlyMatrix(), sigma=1.5, cost_limit_factor=3)
+    stop_function = ThresholdStopFunction(limit=100, patience=20)
+    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingOnlyMatrix(), sigma=3.0, cost_limit_factor=3)
 
     update_function = NoisyAdam(lr=1.5, beta1=0.9, beta2=0.999, epsilon=0.1, gamma=0.5)
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
@@ -67,12 +67,12 @@ if __name__ == '__main__':
 
     tools = [
         ("gdpa-mapping", gdpa_pd_fp_mapping_only_vector),
-        ("bf-mapping", bf_mapping_fp),
+        ("bf-mapping", bf_mapping_fp)
     ]
 
     labels, funcs = zip(*tools)
     runner = SchedRatioEval("gradient_fp_mapping_only_validation", labels=labels, funcs=funcs,
                             preprocessor=unbalance,
-                            systems=systems, utilizations=utilizations, threads=4,
+                            systems=systems, utilizations=utilizations, threads=6,
                             output_dir=args.output_dir, show=False)
     runner.run()
