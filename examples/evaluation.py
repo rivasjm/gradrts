@@ -76,11 +76,11 @@ class SchedRatioEval:
 
         for u_index, u in enumerate(self.utilizations):
             for s in self.systems:
-                # Apply preprocessor BEFORE setting utilization, so that utilization
-                # is set on the preprocessed system (e.g. unbalanced).
+                self.utilization_func(s, u)
+                # Apply preprocessor AFTER setting utilization, so that the
+                # preprocessor sees the correctly-scaled WCETs.
                 if self.preprocessor:
                     self.preprocessor(s)
-                self.utilization_func(s, u)
 
             with Pool(self.threads) as pool:
                 f = partial(self._step, u_index=u_index)

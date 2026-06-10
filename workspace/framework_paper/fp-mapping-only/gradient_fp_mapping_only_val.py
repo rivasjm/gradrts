@@ -10,7 +10,7 @@ from assignment.assignments import PDAssignment
 from assignment.bf_assignment import BruteForceMappingAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
-from examples.generator import unbalance
+from examples.generator import unbalance_contended
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import MappingOnlyExtractor
 from gradient_descent.cost_functions import InvslackCost
@@ -44,7 +44,7 @@ def gdpa_pd_fp_mapping_only_vector(system: LinearSystem) -> bool:
 
 def bf_mapping_fp(system: LinearSystem) -> bool:
     PDAssignment(normalize=True).apply(system)
-    bf = BruteForceMappingAssignment(batch_size=500)
+    bf = BruteForceMappingAssignment(batch_size=100)
     bf.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
@@ -66,13 +66,13 @@ if __name__ == '__main__':
     utilizations = np.linspace(0.5, 0.9, 20)
 
     tools = [
-        ("gdpa-mapping", gdpa_pd_fp_mapping_only_vector),
-        ("bf-mapping", bf_mapping_fp)
+        ("gdpa-mapping", gdpa_pd_fp_mapping_only_vector)
+        # ("bf-mapping", bf_mapping_fp)
     ]
 
     labels, funcs = zip(*tools)
     runner = SchedRatioEval("gradient_fp_mapping_only_validation", labels=labels, funcs=funcs,
-                            preprocessor=unbalance,
+                            preprocessor=unbalance_contended,
                             systems=systems, utilizations=utilizations, threads=6,
                             output_dir=args.output_dir, show=False)
     runner.run()

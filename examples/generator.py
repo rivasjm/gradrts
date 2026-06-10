@@ -112,6 +112,69 @@ def unbalance(system: LinearSystem):
             task.processor = proc
 
 
+def unbalance_contended(system: LinearSystem, max_utilization=0.95):
+    """Unbalance the system by bin-packing tasks into processors with staggered
+    target utilizations, without exceeding max_utilization on any processor.
+
+    Computes the average processor utilisation avg_u = total_u / p, then
+    alternates processor targets: high = avg_u + margin, low = avg_u - margin,
+    where margin = (max_utilization - avg_u) / 2.  On odd processor counts the
+    extra processor gets the high target.  Low targets are clamped to at least
+    avg_u / 2 so that low-utilisation systems still get meaningful contention.
+
+    Tasks are assigned via best-fit decreasing; any task that does not fit its
+    target goes to the least-loaded processor that can accept it without
+    exceeding max_utilization.
+    """
+    tasks = system.tasks
+    procs = system.processors
+    p = len(procs)
+
+    total_u = sum(t.utilization for t in tasks)
+    avg_u = total_u / p
+
+    if avg_u >= max_utilization:
+        raise ValueError(
+            f"Average utilisation ({avg_u:.3f}) is at or above "
+            f"max_utilisation ({max_utilization}); nothing to contend with")
+
+    margin = (max_utilization - avg_u) / 2
+    hi = min(avg_u + margin, max_utilization)
+    lo = max(avg_u - margin, avg_u / 2)
+
+    targets = [hi if i % 2 == 0 else lo for i in range(p)]
+
+    # Clear old assignments so we don't leak state from a previous generation
+    for t in tasks:
+        t.processor = None
+
+    # Best-fit decreasing
+    tasks_sorted = sorted(tasks, key=lambda t: t.utilization, reverse=True)
+    load = [0.0] * p
+
+    for task in tasks_sorted:
+        tu = task.utilization
+        best = -1
+        best_rem = -1.0
+        # First pass: try to stay within the target for this processor
+        for pi in range(p):
+            rem = targets[pi] - load[pi]
+            if load[pi] + tu <= targets[pi] and rem > best_rem:
+                best = pi
+                best_rem = rem
+        # Fallback: least-loaded processor that respects max_utilization
+        if best == -1:
+            fit = [pi for pi in range(p) if load[pi] + tu <= max_utilization]
+            if fit:
+                best = min(fit, key=lambda pi: load[pi])
+            else:
+                # Defensive: should never happen when avg_u < max_utilization
+                # and no single task exceeds max_utilization, but drop here.
+                best = min(range(p), key=lambda pi: load[pi])
+        load[best] += tu
+        task.processor = procs[best]
+
+
 def to_edf(system: LinearSystem, local=True):
     for proc in system.processors:
         proc.sched = SchedulerType.EDF
