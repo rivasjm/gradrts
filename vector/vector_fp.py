@@ -57,9 +57,10 @@ class PriorityScenarios:
 
 
 class VectorFPGradientFunction(GradientFunction):
-    def __init__(self, scenarios_builder: PriorityScenarios, sigma=1.5):
+    def __init__(self, scenarios_builder: PriorityScenarios, sigma=1.5, cost_limit_factor=10):
         self.delta_function = AvgSeparationDelta(sigma=sigma)
         self.scenarios_builder = scenarios_builder
+        self.cost_limit_factor = cost_limit_factor
         self.cache = ResultsCache()
 
     def reset(self):
@@ -70,7 +71,7 @@ class VectorFPGradientFunction(GradientFunction):
         n = len(tasks)
         priority_matrices = self.scenarios_builder.apply(system, inputs)
         deadlines = np.array([task.flow.deadline for task in tasks]).reshape(n, 1)
-        vholistic = VectorHolisticFPAnalysis(limit_factor=10, verbose=False, cache=self.cache)
+        vholistic = VectorHolisticFPAnalysis(limit_factor=self.cost_limit_factor, verbose=False, cache=self.cache)
         vholistic.apply(system, scenarios=priority_matrices)
         r = vholistic.scenarios_response_times
         costs = np.max((r - deadlines) / deadlines, axis=0)
@@ -109,38 +110,44 @@ class MappingOnlyMatrix(PriorityScenarios):
     def apply(self, S: LinearSystem, inputs: [[float]]) -> np.ndarray:
         p = len(S.processors)
         n = len(S.tasks)
-        pm = np.zeros((len(inputs), n, n))
+        s = len(inputs)
+        if s == 0:
+            return np.zeros((0, n, n))
+
         tasks = S.tasks
-        for i, x in enumerate(inputs):
-            # Determine discrete mapping for this candidate input x
-            mapping_tuple = tuple(proc(x[t * p:t * p + p]) - 1 for t in range(n))
+        deadlines = np.array([t.deadline for t in tasks])
 
-            # Group task indices by processor index under this candidate mapping
-            proc_tasks = [[] for _ in range(p)]
-            for task_idx, proc_idx in enumerate(mapping_tuple):
-                proc_tasks[proc_idx].append(task_idx)
+        # Discrete mapping for all candidates at once: (S, n, p) -> argmax -> (S, n)
+        inputs_arr = np.array(inputs).reshape(s, n, p)
+        mapping = np.argmax(inputs_arr, axis=2)
 
-            # Assign local Deadline Monotonic priorities (with index as tie-breaker)
-            candidate_priorities = [0.0] * n
-            for proc_idx in range(p):
-                sorted_indices = sorted(
-                    proc_tasks[proc_idx],
-                    key=lambda idx: (tasks[idx].deadline if tasks[idx].deadline is not None else 0.0, idx),
-                    reverse=True
-                )
-                for prio_val, idx in enumerate(sorted_indices, start=1):
-                    candidate_priorities[idx] = float(prio_val)
+        # Which tasks share a processor, per candidate
+        mapping_eq = mapping[:, :, np.newaxis] == mapping[:, np.newaxis, :]
 
-            # Normalize priorities
-            max_prio = max(candidate_priorities) if candidate_priorities else 1.0
-            if max_prio > 0:
-                candidate_priorities = [prio / max_prio for prio in candidate_priorities]
+        # Deadlines comparison (same across all candidates)
+        d_i = deadlines.reshape(1, n, 1)
+        d_j = deadlines.reshape(1, 1, n)
+        idx_i = np.arange(n).reshape(1, n, 1)
+        idx_j = np.arange(n).reshape(1, 1, n)
 
-            # Construct priority interference matrix
-            mapping = np.array(mapping_tuple).reshape(-1, 1)
-            prio = np.array(candidate_priorities).reshape(-1, 1)
-            temp = (prio < prio.T) * (mapping == mapping.T)
-            pm[i] = temp
+        # Task j is ranked above task i when:
+        #   deadline[j] < deadline[i] OR (equal AND j < i)
+        above = ((d_j < d_i) | ((d_j == d_i) & (idx_j < idx_i))) & mapping_eq
+
+        rank = above.sum(axis=2) + 1
+        k = mapping_eq.sum(axis=2)
+
+        priorities = (k - rank + 1).astype(np.float64)
+
+        # Normalize per candidate
+        max_prio = priorities.max(axis=1, keepdims=True)
+        max_prio[max_prio <= 0] = 1.0
+        priorities = priorities / max_prio
+
+        # Build priority interference matrix
+        prio_col = priorities.reshape(s, n, 1)
+        pm = ((prio_col < prio_col.transpose(0, 2, 1)) & mapping_eq).astype(np.float64)
+
         return pm
 
 
