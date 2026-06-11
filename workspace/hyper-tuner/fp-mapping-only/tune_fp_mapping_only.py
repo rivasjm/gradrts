@@ -2,6 +2,7 @@ import argparse
 import os
 from datetime import datetime
 from random import Random
+import numpy as np
 
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from assignment.assignments import PDAssignment
@@ -14,8 +15,6 @@ from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from vector.vector_fp import VectorFPGradientFunction, MappingOnlyMatrix
-
-TARGET_UTILIZATION = 0.70
 
 
 def build_optimizer(lr, sigma, gamma, beta1, beta2, epsilon, patience, cost_limit_factor):
@@ -56,12 +55,15 @@ if __name__ == "__main__":
                         help="Number of top combinations in bar chart (default: 15)")
     args = parser.parse_args()
 
+    utilizations = np.linspace(0.5, 0.9, 20)
+    utilization = utilizations[8]
+
     print(f"Started:  {datetime.now()}")
     print(f"CLI args: threads={args.threads}, top_n={args.top_n}, output_dir={args.output_dir}")
-    print(f"Scenario: fp-mapping-only, target_utilization={TARGET_UTILIZATION}")
+    print(f"Scenario: fp-mapping-only, target_utilization={utilization}")
     print(f"Modules:  MappingOnlyExtractor, InvslackCost, ThresholdStopFunction")
     print(f"          VectorFPGradientFunction(MappingOnlyMatrix), NoisyAdam")
-    print(f"Setup:    PDAssignment(normalize=True), unbalance_contended, set_utilization={TARGET_UTILIZATION}")
+    print(f"Setup:    PDAssignment(normalize=True), unbalance_contended, set_utilization={utilization}")
     print()
 
     rnd = Random(42)
@@ -70,19 +72,19 @@ if __name__ == "__main__":
     systems = [get_system(size, rnd, balanced=False, name=str(i),
                           deadline_factor_min=0.5,
                           deadline_factor_max=1) for i in range(n)]
-
+    
     for s in systems:
-        set_utilization(s, TARGET_UTILIZATION)
+        set_utilization(s, utilization)
         unbalance_contended(s)
 
     param_grid = {
         "lr": [0.5, 1.0, 1.5, 3.0],
-        "sigma": [1.0, 1.5, 3.0, 5.0],
-        "gamma": [0.3, 0.5, 0.7, 0.9],
-        "beta1": [0.8, 0.9],
-        "beta2": [0.99, 0.999],
-        "epsilon": [0.01, 0.1, 1.0],
-        "patience": [10, 20, None],
+        "sigma": [1.0, 3.0],
+        "gamma": [0.1, 0.3],
+        "beta1": [0.9],
+        "beta2": [0.999],
+        "epsilon": [0.01, 0.1],
+        "patience": [20, None],
         "cost_limit_factor": [1, 3, 10],
     }
 

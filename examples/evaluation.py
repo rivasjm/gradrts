@@ -148,7 +148,7 @@ class SchedRatioEval:
         ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
         fig.tight_layout()
         if save:
-            fig.savefig(f"{label}.png")
+            fig.savefig(self._path(f"{label}.png"))
         if show:
             plt.show()
 
@@ -167,7 +167,7 @@ class SchedRatioEval:
         ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
         fig.tight_layout()
         if save:
-            fig.savefig(f"{label}_summary.png")
+            fig.savefig(self._path(f"{label}_summary.png"))
         if show:
             plt.show()
 
