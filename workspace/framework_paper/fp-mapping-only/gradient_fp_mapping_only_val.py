@@ -42,6 +42,12 @@ def gdpa_pd_fp_mapping_only_vector(system: LinearSystem) -> bool:
     return system.is_schedulable()
 
 
+def pd_only(system: LinearSystem) -> bool:
+    PDAssignment(normalize=True).apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
+
+
 def bf_mapping_fp(system: LinearSystem) -> bool:
     PDAssignment(normalize=True).apply(system)
     bf = BruteForceMappingAssignment(batch_size=100)
@@ -66,8 +72,9 @@ if __name__ == '__main__':
     utilizations = np.linspace(0.5, 0.9, 20)
 
     tools = [
-        ("gdpa-mapping", gdpa_pd_fp_mapping_only_vector)
-        # ("bf-mapping", bf_mapping_fp)
+        ("gdpa-mapping", gdpa_pd_fp_mapping_only_vector),
+        ("pd-mapping", pd_only),
+        ("bf-mapping", bf_mapping_fp)
     ]
 
     labels, funcs = zip(*tools)
