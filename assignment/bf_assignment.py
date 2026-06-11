@@ -13,7 +13,7 @@ class BruteForceFPAssignment(AnalysisFunction):
     def __init__(self, batch_size=10000, verbose=False):
         self.batch_size = batch_size if batch_size > 0 else 1
         self.verbose = verbose
-        self.analysis = VectorHolisticFPAnalysis(limit_factor=10)
+        self.analysis = VectorHolisticFPAnalysis(limit_factor=1)
         self.schedulable = False
         self.exec_time = ExecTime()
         self.iterations_to_sched = -1
@@ -114,7 +114,7 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
     def __init__(self, batch_size=10000, verbose=False):
         self.batch_size = batch_size if batch_size > 0 else 1
         self.verbose = verbose
-        self.analysis = VectorHolisticFPAnalysis(limit_factor=10)
+        self.analysis = VectorHolisticFPAnalysis(limit_factor=1)
         self.schedulable = False
         self.exec_time = ExecTime()
         self.iterations_to_sched = -1
@@ -223,7 +223,7 @@ class BruteForceMappingAssignment(AnalysisFunction):
     def __init__(self, batch_size=10000, verbose=False):
         self.batch_size = batch_size if batch_size > 0 else 1
         self.verbose = verbose
-        self.analysis = VectorHolisticFPAnalysis(limit_factor=10)
+        self.analysis = VectorHolisticFPAnalysis(limit_factor=1)
         self.schedulable = False
         self.exec_time = ExecTime()
         self.iterations_to_sched = -1
