@@ -131,65 +131,45 @@ class SchedRatioEval:
         return os.path.join(self.output_dir, filename)
 
     def _line_chart(self, label, data, ylabel, save=True, show=True):
+        plt.clf()
         df = pd.DataFrame(data=data,
                           index=self.utilizations,
                           columns=self.labels)
+        fig, ax = plt.subplots()
+        df.plot(ax=ax)
+        ax.set_ylabel(ylabel)
+        ax.set_xlabel("Average utilization")
+
+        # print system size
+        ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
+
+        # register execution vector_times
+        time_label = f"{time.time() - self.start:.2f} seconds"
+        ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
+        fig.tight_layout()
+        if save:
+            fig.savefig(f"{label}.png")
         if show:
-            fig = self._figs.get(label)
-            if fig is None:
-                fig, ax = plt.subplots(num=label)
-                ax.set_ylabel(ylabel)
-                ax.set_xlabel("Average utilization")
-                self._figs[label] = fig
-            else:
-                ax = fig.axes[0]
-            ax.clear()
-            df.plot(ax=ax)
-            ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
-            time_label = f"{time.time() - self.start:.2f} seconds"
-            ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
-            fig.tight_layout()
-            if save:
-                fig.savefig(self._path(f"{label}.png"))
-            plt.draw()
-            plt.pause(0.01)
-        elif save:
-            fig, ax = plt.subplots()
-            df.plot(ax=ax)
-            ax.set_ylabel(ylabel)
-            ax.set_xlabel("Average utilization")
-            fig.tight_layout()
-            fig.savefig(self._path(f"{label}.png"))
-            plt.close(fig)
+            plt.show()
 
     def _bar_chart(self, label, data, ylabel, save=True, show=True):
-        bar_label = f"{label}_summary"
+        plt.clf()
         df = pd.DataFrame(data=data, columns=self.labels)
+        fig, ax = plt.subplots()
+        df.sum().plot.barh(ax=ax)
+        ax.tick_params(axis='both', which='major', labelsize=6)
+
+        # print system size
+        ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
+
+        # register execution vector_times
+        time_label = f"{time.time() - self.start:.2f} seconds"
+        ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
+        fig.tight_layout()
+        if save:
+            fig.savefig(f"{label}_summary.png")
         if show:
-            fig = self._figs.get(bar_label)
-            if fig is None:
-                fig, ax = plt.subplots(num=bar_label)
-                ax.tick_params(axis='both', which='major', labelsize=6)
-                self._figs[bar_label] = fig
-            else:
-                ax = fig.axes[0]
-            ax.clear()
-            df.sum().plot.barh(ax=ax)
-            ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
-            time_label = f"{time.time() - self.start:.2f} seconds"
-            ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
-            fig.tight_layout()
-            if save:
-                fig.savefig(self._path(f"{bar_label}.png"))
-            plt.draw()
-            plt.pause(0.01)
-        elif save:
-            fig, ax = plt.subplots()
-            df.sum().plot.barh(ax=ax)
-            ax.tick_params(axis='both', which='major', labelsize=6)
-            fig.tight_layout()
-            fig.savefig(self._path(f"{bar_label}.png"))
-            plt.close(fig)
+            plt.show()
 
     def _excel(self, label, data):
         df = pd.DataFrame(data=data,

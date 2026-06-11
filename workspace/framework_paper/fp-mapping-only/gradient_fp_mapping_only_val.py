@@ -24,8 +24,8 @@ def gdpa_pd_fp_mapping_only_vector(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     parameter_handler = MappingOnlyExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
-    stop_function = ThresholdStopFunction(limit=100, patience=20)
-    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingOnlyMatrix(), sigma=3.0, cost_limit_factor=3)
+    stop_function = ThresholdStopFunction(limit=100, patience=None)
+    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingOnlyMatrix(), sigma=2.0, cost_limit_factor=3)
 
     update_function = NoisyAdam(lr=1.5, beta1=0.9, beta2=0.999, epsilon=0.1, gamma=0.5)
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
