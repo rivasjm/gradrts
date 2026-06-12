@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     rnd = Random(42)
     size = (3, 4, 3)
-    n = 50
+    n = 100
     systems = [get_system(size, rnd, balanced=False, name=str(i),
                           deadline_factor_min=0.5,
                           deadline_factor_max=1) for i in range(n)]
@@ -78,14 +78,14 @@ if __name__ == "__main__":
         unbalance_contended(s)
 
     param_grid = {
-        "lr": [0.5, 1.0, 1.5, 3.0],
+        "lr": [1.5, 3.0],
         "sigma": [1.0, 3.0],
         "gamma": [0.1, 0.3],
         "beta1": [0.9],
         "beta2": [0.999],
         "epsilon": [0.01, 0.1],
-        "patience": [20, None],
-        "cost_limit_factor": [1, 3, 10],
+        "patience": [None],
+        "cost_limit_factor": [1],
     }
 
     tuner = GradientHyperTuner(
