@@ -56,19 +56,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     utilizations = np.linspace(0.5, 0.9, 20)
-    utilization = utilizations[8]
-
-    print(f"Started:  {datetime.now()}")
-    print(f"CLI args: threads={args.threads}, top_n={args.top_n}, output_dir={args.output_dir}")
-    print(f"Scenario: fp-mapping-only, target_utilization={utilization}")
-    print(f"Modules:  MappingOnlyExtractor, InvslackCost, ThresholdStopFunction")
-    print(f"          VectorFPGradientFunction(MappingOnlyMatrix), NoisyAdam")
-    print(f"Setup:    PDAssignment(normalize=True), unbalance_contended, set_utilization={utilization}")
-    print()
-
+    utilization = utilizations[14]
     rnd = Random(42)
     size = (3, 4, 3)
-    n = 100
+    n = 50
     systems = [get_system(size, rnd, balanced=False, name=str(i),
                           deadline_factor_min=0.5,
                           deadline_factor_max=1) for i in range(n)]
@@ -85,8 +76,16 @@ if __name__ == "__main__":
         "beta2": [0.999],
         "epsilon": [0.01, 0.1],
         "patience": [None],
-        "cost_limit_factor": [1],
+        "cost_limit_factor": [1, 3],
     }
+
+    print(f"Started:  {datetime.now()}")
+    print(f"CLI args: threads={args.threads}, top_n={args.top_n}, output_dir={args.output_dir}")
+    print(f"Scenario: fp-mapping-only, target_utilization={utilization}")
+    print(f"Modules:  MappingOnlyExtractor, InvslackCost, ThresholdStopFunction")
+    print(f"          VectorFPGradientFunction(MappingOnlyMatrix), NoisyAdam")
+    print(f"Setup:    PDAssignment(normalize=True), unbalance_contended, set_utilization={utilization}")
+    print()
 
     tuner = GradientHyperTuner(
         name="fp_mapping_only",

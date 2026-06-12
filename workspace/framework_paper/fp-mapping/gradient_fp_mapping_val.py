@@ -5,10 +5,11 @@ from random import Random
 from functools import partial
 
 from assignment.assignments import PDAssignment, EQSAssignment, EQFAssignment
+from assignment.bf_assignment import BruteForceFPMappingAssignment
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
-from examples.generator import unbalance
+from examples.generator import unbalance_contended
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import PriorityExtractor, MappingPriorityExtractor
 from gradient_descent.cost_functions import InvslackCost
@@ -22,10 +23,10 @@ def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     parameter_handler = PriorityExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
-    stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction(scenarios_builder=PrioritiesMatrix())
+    stop_function = ThresholdStopFunction(limit=100, patience=None)
+    gradient_function = VectorFPGradientFunction(scenarios_builder=PrioritiesMatrix(), sigma=3.0, cost_limit_factor=1)
 
-    update_function = NoisyAdam()
+    update_function = NoisyAdam(lr=1.5, beta1=0.9, beta2=0.999, epsilon=0.01, gamma=0.3)
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                         cost_function=cost_function,
                                         stop_function=stop_function,
@@ -45,9 +46,9 @@ def gdpa_pd_fp_mapping_vector(system: LinearSystem) -> bool:
     parameter_handler = MappingPriorityExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(), sigma=1.5)
+    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(), sigma=3.0, cost_limit_factor=1)
 
-    update_function = NoisyAdam(lr=1.5, beta1=0.9, beta2=0.999, epsilon=0.1, gamma=0.5)
+    update_function = NoisyAdam(lr=1.5, beta1=0.9, beta2=0.999, epsilon=0.01, gamma=0.3)
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                         cost_function=cost_function,
                                         stop_function=stop_function,
@@ -83,6 +84,13 @@ def eqf_fp(system: LinearSystem) -> bool:
     return system.is_schedulable()
 
 
+def bf_fp_mapping(system: LinearSystem) -> bool:
+    bf = BruteForceFPMappingAssignment(batch_size=100)
+    bf.apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
+
+
 def hopa_fp(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     hopa = HOPAssignment(analysis=analysis)
@@ -106,6 +114,7 @@ if __name__ == '__main__':
     tools = [
         ("gdpa-mapping", gdpa_pd_fp_mapping_vector),
         ("gdpa", gdpa_pd_fp_vector),
+        ("bf-mapping", bf_fp_mapping),
         # ("hopa", hopa_fp),
         # ("eqs", eqs_fp),
         # ("eqf", eqf_fp),
@@ -114,6 +123,6 @@ if __name__ == '__main__':
 
     labels, funcs = zip(*tools)
     runner = SchedRatioEval("gradient_fp_mapping_validation", labels=labels, funcs=funcs,
-                            preprocessor=unbalance,
+                            preprocessor=unbalance_contended,
                             systems=systems, utilizations=utilizations, threads=8)
     runner.run()
