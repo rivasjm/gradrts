@@ -78,8 +78,8 @@ if __name__ == '__main__':
     ]
 
     labels, funcs = zip(*tools)
-    runner = SchedRatioEval("gradient_fp_mapping_only_validation", labels=labels, funcs=funcs,
-                            preprocessor=unbalance_contended,
+    runner = SchedRatioEval("gradient_fp_mapping_only_balanced_validation", labels=labels, funcs=funcs,
+                            # preprocessor=unbalance_contended,
                             systems=systems, utilizations=utilizations, threads=8,
                             output_dir=args.output_dir, show=False)
     runner.run()

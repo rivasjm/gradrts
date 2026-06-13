@@ -1,4 +1,6 @@
+import argparse
 import numpy as np
+import os
 
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from random import Random
@@ -8,7 +10,7 @@ from assignment.assignments import PDAssignment, EQSAssignment, EQFAssignment
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
-from examples.generator import unbalance
+from examples.generator import unbalance_contended
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import PriorityExtractor, MappingPriorityExtractor
 from gradient_descent.cost_functions import InvslackCost
@@ -92,6 +94,11 @@ def hopa_fp(system: LinearSystem) -> bool:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Gradient FP+mapping validation")
+    parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
+                        help="Output directory for generated files (default: script directory)")
+    args = parser.parse_args()
+
     # create population of examples
     rnd = Random(42)
     size = (3, 4, 3)  # flows, tasks, procs
@@ -113,7 +120,8 @@ if __name__ == '__main__':
     ]
 
     labels, funcs = zip(*tools)
-    runner = SchedRatioEval("gradient_fp_mapping_validation", labels=labels, funcs=funcs,
-                            preprocessor=unbalance,
-                            systems=systems, utilizations=utilizations, threads=8)
+    runner = SchedRatioEval("gradient_fp_mapping_balanced_validation", labels=labels, funcs=funcs,
+                            # preprocessor=unbalance_contended,
+                            systems=systems, utilizations=utilizations, threads=8,
+                            output_dir=args.output_dir)
     runner.run()
