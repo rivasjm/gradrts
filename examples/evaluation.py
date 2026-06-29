@@ -71,14 +71,12 @@ class SchedRatioEval:
         if self.show:
             plt.ion()
         job = 0
-        results = np.zeros((len(self.utilizations), len(self.labels)))
-        running_times = np.zeros((len(self.utilizations), len(self.labels)))
+        all_results = np.zeros((len(self.utilizations), len(self.labels)))
+        all_times = np.zeros((len(self.utilizations), len(self.labels)))
 
         for u_index, u in enumerate(self.utilizations):
             for s in self.systems:
                 self.utilization_func(s, u)
-                # Apply preprocessor AFTER setting utilization, so that the
-                # preprocessor sees the correctly-scaled WCETs.
                 if self.preprocessor:
                     self.preprocessor(s)
 
@@ -86,12 +84,15 @@ class SchedRatioEval:
                 f = partial(self._step, u_index=u_index)
                 for scheds, times in pool.imap_unordered(f, self.systems):
                     job += 1
-                    results[u_index, :] += scheds
-                    running_times[u_index, :] += times
+                    all_results[u_index, :] += scheds
+                    all_times[u_index, :] += times
                     print(f"{datetime.now()} : u={u} job={job}")
 
-            self._save(results, "schedulables", self.show)
-            self._save(running_times/len(self.systems), "times", False)
+            self._save(all_results, "schedulables", self.show)
+            self._save(all_times / len(self.systems), "times", False)
+
+        # Aggregate efficiency scatter (total schedulable vs total time)
+        self._efficiency_chart(all_results, all_times)
 
         if self.show:
             plt.ioff()
@@ -176,3 +177,46 @@ class SchedRatioEval:
                           index=self.utilizations,
                           columns=self.labels)
         df.to_excel(self._path(f"{label}.xlsx"))
+
+    def _efficiency_chart(self, results, times):
+        """Scatter plot: total schedulable vs total execution time per method."""
+        total_sched = results.sum(axis=0)
+        total_time = times.sum(axis=0)
+        n_systems = len(self.systems) * len(self.utilizations)
+
+        plt.clf()
+        fig, ax = plt.subplots(figsize=(7, 5))
+
+        colors = plt.cm.tab10(np.linspace(0, 1, len(self.labels)))
+
+        for i, label in enumerate(self.labels):
+            ax.scatter(total_time[i], total_sched[i],
+                       s=120, color=colors[i], edgecolors='white',
+                       linewidth=1.5, zorder=5)
+            ax.annotate(label, (total_time[i], total_sched[i]),
+                        textcoords="offset points", xytext=(8, 6),
+                        fontsize=10, fontweight='bold', color=colors[i])
+
+        ax.set_xlabel('Total execution time (seconds)')
+        ax.set_ylabel(f'Total schedulable systems (out of {n_systems})')
+        ax.set_title(f'{self.name}\nefficiency: schedulability vs computation cost')
+        ax.grid(True, alpha=0.3)
+
+        # Pareto frontier
+        pts = sorted(zip(total_time, total_sched, self.labels),
+                     key=lambda x: (x[0], -x[1]))
+        frontier_x, frontier_y = [], []
+        max_y = -1
+        for tx, ty, _ in pts:
+            if ty > max_y:
+                frontier_x.append(tx)
+                frontier_y.append(ty)
+                max_y = ty
+        if len(frontier_x) >= 2:
+            ax.plot(frontier_x, frontier_y, '--', color='grey',
+                    alpha=0.5, linewidth=1, zorder=1)
+
+        fig.tight_layout()
+        fig.savefig(self._path(f"{self.name}_efficiency.png"))
+        if self.show:
+            plt.show()
