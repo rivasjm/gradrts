@@ -271,3 +271,274 @@ workspace/holistic_linearization/
 
 - `examples/evaluation.py` — añadido `_efficiency_chart()` que genera
   automáticamente scatter plot schedulability vs tiempo en todos los estudios.
+
+---
+
+## 11. Vectorización de V1 (WP-1)
+
+### Motivación
+
+V1-FD (§8) demostró que V1 con prioridades discretas produce gradientes
+informativos (+325 sistemas sobre DM), pero queda por debajo de GDPA
+(1741) por ser **secuencial** (24 evaluaciones V1 por paso). Se hipotetizó
+que vectorizando V1 se obtendría un surrogate ~10–20× más rápido por
+evaluación que Holistic, situando a V1-FD en o por encima de la frontera de
+Pareto de GDPA.
+
+### Implementación (`vector_v1.py`)
+
+`VectorLinearizedV1Analysis` replica la API de `VectorHolisticFPAnalysis`
+y reutiliza su infraestructura (`ResultsCache`, `successor_matrix`,
+`jitter_matrix`, pruning de escenarios sobre-límite, cache bidireccional).
+
+La clave del speedup teórico es sustituir el bucle interno deHolistic-vector
+(convergencia de `w` mediante fixed-point iterado) por la fórmula cerrada
+de V1:
+
+```
+w = (p * C_i + JU_hp) / (1 - U_hp)      # cerrado, sin iteración
+r = w - (p-1)*T + j
+r_max = max(r_max, r)
+```
+
+Bucle externo: hasta que ningún escenario cambie (finalización clásica
+de Jacobi). Cada iteración `p` se evalúa para todos los escenarios
+activos en una sola llamada matmul (`pm_f @ ju`).
+
+### Validación de equivalencia (`test_vector_v1.py`)
+
+50 sistemas aleatorios 3f × 4t × 3p:
+
+| Métrica                          | valor       |
+|----------------------------------|-------------|
+| Diferencia WCRT vs V1 secuencial | 8.5e-14     |
+| Mismatches (>1e-3 rel)           | 0 / 50      |
+| Spearman vs Holistic (pooled)    | 0.978       |
+
+Las implementaciones secuencial y vectorizada son numéricamente idénticas
+y V1 mantiene su correlación de ranking con Holistic.
+
+### Benchmark de speed (`benchmark_vector_v1.py`)
+
+Tiempo por evaluación (μs) comparando V1-vectorizado y Holistic-vectorizado
+con caches frescas por llamada (régimen de gradiente):
+
+| U     | V1vec  | Holvec | ratio V1/Hol |
+|-------|--------|--------|--------------|
+| 0.50  |  66 µs | 37 µs  | 1.78×        |
+| 0.70  | 181 µs | 86 µs  | 2.11×        |
+| 0.85  | 1132 µs | 330 µs | 3.43×       |
+| 0.90  | 1346 µs | 527 µs | 2.55×        |
+
+Con cache compartido por sistema (régimen de muchas perturbaciones del
+mismo sistema, que es el caso real):
+
+| U     | V1vec  | Holvec |
+|-------|--------|--------|
+| todos | ~9 µs  | ~10 µs |
+
+### Conclusión
+
+**La vectorización de V1 no aporta el speedup esperado.** En régimen con
+cache (el relevante en optimización), V1 y Holistic tienen coste por
+evaluación comparable (~10 µs). El "20× más rápido" de V1-secuencial en
+el INFORME §8 era un artefacto de comparar V1-secuencial contra
+Holistic-secuencial en Python puro, donde el bucle interno `w` de
+Holistic es caro. Vectorizado, ese bucle desaparece y ambos convergen.
+
+V1 sigue siendo útil como **ranking surrogate** (Spearman 0.978), pero
+no como **evaluación rápida**.
+
+### Archivos generados
+
+```
+workspace/holistic_linearization/
+├── vector_v1.py              # VectorLinearizedV1Analysis ★
+├── test_vector_v1.py         # Equivalencia + benchmark  ★
+├── benchmark_vector_v1.py    # V1vec vs Holvec, μs/eval  ★
+└── (logs de benchmark inline en consola)
+```
+
+---
+
+## 12. V1-TopK: exploración barata + validación Holistic (WP-2)
+
+### Motivación
+
+Visto que V1 es un surrogate de ranking excelente (Spearman 0.94/0.978)
+y que V1-vectorizado permite evaluar 24–100 escenarios en una sola pasada
+numpy (§11), se hipotetizó una vía **no iterativa**:
+
+1. Generar N candidatos de asignación de prioridad.
+2. Ranquearlos con una sola llamada a `VectorLinearizedV1Analysis`.
+3. Validar los K mejores con Holistic real y devolver el primer plano.
+
+Coste total por sistema ≈ N V1-evals + K Holistic-evals, frente a GDPA que
+gasta ~720 Holistic-evals (30 pasos × 24 escenarios).
+
+### Implementación (`v1_topk.py`, `v1topk_experiment.py`)
+
+`v1_topk_assign(system, n_candidates, k, perturbations)`:
+
+- **Candidato 0**: asignación DM (ancla — garantiza no regresar vs DM).
+- **Candidatos 1..N-1**: dos modos de muestreo:
+  - `perturbations=0` (uniforme): prioridades aleatorias por procesador.
+  - `perturbations>0` (DM-anchored): se aplican `perturbations` swaps
+    adyacentes aleatorios dentro de cada procesador, partiendo de DM.
+- **Ranking V1**: una llamada a `VectorLinearizedV1Analysis.apply(system,
+  scenarios=pm)` con todos los candidatos batched, coste = avg flow WCRT.
+- **Validación**: los K mejores candidatos se insertan y validan con
+  `HolisticFPAnalysis(limit_factor=1, reset=True)`. Se devuelve el primer
+  schedulable.
+
+`V1TopKMethod` es un callable picklable para `SchedRatioEval`.
+
+### Búsqueda de hiperparámetros (piloto, 10 sistemas × 20 U = 200)
+
+Variamos `n_candidates` (N), `k` (top-K) y `perturbations` (swaps DM):
+
+| N   | k  | pert | V1-TopK | Tiempo |
+|-----|----|------|---------|--------|
+| 100 |  5 | 0    | 109     | 6.4 s  |
+| 100 |  5 | 1    |  99     | 2.8 s  |
+| 100 |  5 | 2    | 110     | 4.7 s  |
+| 100 |  5 | 3    | 117     | 5.5 s  |
+| 100 | 10 | 3    | **128** | 5.3 s  |
+| 300 |  5 | 3    | 110     | 8.8 s  |
+
+Observaciones:
+- Aumentar N apenas mueve la aguja (de 110 a 110 pasando de 100 a 300).
+- Aumentar k sí ayuda (de 117 a 128 pasando de 5 a 10).
+- El modo DM-anchored (`pert>0`) mejora sobre uniforme hasta `pert≈3`, luego se satura.
+- Mejor configuración piloto: **N=100, K=10, pert=3 → 128/200**.
+
+HOPA en el mismo piloto alcanza 153/200; GDPA 156/200. V1-TopK ya está
+claramente por debajo.
+
+### Experimento completo (`v1topk_experiment.py`)
+
+Configuración del mejor piloto: N=100, K=10, pert=3, 100 sistemas 3f×4t×3p,
+barrido U ∈ [0.5, 0.9] (20 niveles, 2000 evaluaciones totales por método).
+
+| Método      | Sched (/2000) | Tiempo total (s) | vs DM          |
+|-------------|---------------|------------------|----------------|
+| DM          | 1230          | 0.4              | —              |
+| HOPA        | 1687          | 31               | +457           |
+| GDPA        | 1741          | 123              | +511           |
+| **V1-TopK** | **1398**      | **620**          | **+168**       |
+
+Por nivel de utilización (cada celda = sistemas schedulables de 100):
+V1-TopK sigue a HOPA hasta U≈0.68 y luego colapsa; por encima de U=0.79
+todos los métodos fallan (incluida GDPA).
+
+### Comparación con V1-FD (§8)
+
+V1-TopK es **peor que el propio V1-FD** del INFORME §8, que ya no era
+competitivo frente a GDPA:
+
+| Método      | Sched | Tiempo | vs DM |
+|-------------|-------|--------|-------|
+| V1-FD       | 1555  | 495 s  | +325  |
+| V1-TopK     | 1398  | 620 s  | +168  |
+
+### Conclusión: por qué fracasa V1-TopK
+
+La hipótesis de trabajo era que V1 + ranking resolvería el problema de
+generar buenas asignaciones. Dos hallazgos la desmienten:
+
+1. **El coste por evaluación V1 ≈ coste por evaluación Holistic**
+   (§11). La "exploración barata" no es barata: V1-vectorizado y
+   Holistic-vectorizado convergen a ~10 µs/eval con cache. En el régimen
+   sin cache, V1 es incluso 2-3× más lento que Holistic a alta U. Por lo
+   tanto N V1-evals + K Holistic-evals ≈ (N+K) Holistic-evals, comparable
+   o peor que los 720 Holistic-evals de GDPA en coste absoluto.
+
+2. **El cuello es la cobertura del espacio, no la identificación.**
+   El espacio de permutaciones por procesador en un sistema 4t×3p es
+   4!³≈13 824 combinaciones. Muestrear N=100 (0.7% del espacio) tiene
+   baja probabilidad de contener un punto schedulable en sistemas muy
+   cargados. V1 ranquea correctamente esos 100, pero ningún candidato
+   es realmente bueno. HOPA y GDPA resuelven esto con estructura:
+   HOPA via hill-climbing con heurística ka/kr que CAMBIA de vecino
+   según el paisaje; GDPA via gradiente informado que mueve las
+   prioridades en la dirección de máximo descenso del coste. Muestreo
+   no informado no escala.
+
+La mejora marginal con DM-anchored swaps (`pert=3`: 109→117→128 para
+k=5,10) confirma que la **estructura del problema no está en el
+espacio de permutaciones lejos de DM**, sino en trayectorias informadas
+hacia la frontera. La Spearman 0.97 de V1 mide la calidad del ranker,
+no la del muestreador.
+
+### Lesson aprendida
+
+> Un ranking perfecto sobre muestras mediocres sigue dando resultados mediocres.
+> La calidad de la exploración (cómo se generan candidatos) domina a la
+> calidad de la evaluación (cómo se ranquean) cuando el espacio de búsqueda
+> es combinatorio. Esto es lo opuesto a la conclusión de §9 lección 6
+> ("la dirección del gradiente es más importante que la precisión del
+> surrogate"), donde GDPA sí tenía un muestreador informado (gradiente).
+
+### Archivos generados
+
+```
+workspace/holistic_linearization/
+├── v1_topk.py                       # v1_topk_assign() + V1TopKMethod  ★
+├── v1topk_experiment.py             # DM/HOPA/GDPA/V1-TopK via SchedRatioEval  ★
+├── v1topk_vs_baseline_schedulables.{png,xlsx}
+├── v1topk_vs_baseline_schedulables_summary.png
+├── v1topk_vs_baseline_times.{png,xlsx}
+├── v1topk_vs_baseline_times_summary.png
+└── v1topk_vs_baseline_efficiency.png
+```
+
+---
+
+## 13. Estado final y vías restantes
+
+### Resumen acumulado de métodos
+
+| Método          | Sched (/2000) | Tiempo (s) | vs DM  | Frontera Pareto |
+|-----------------|---------------|------------|--------|-----------------|
+| DM              | 1230          | 0.4        | —      | eficiente (ref) |
+| HOPA            | 1687          | 31         | +457   | eficiente       |
+| **GDPA**        | **1741**      | **123**    | **+511** | **dominante** |
+| V1-FD (§8)      | 1555          | 495        | +325   | dominado        |
+| V1-TopK (§12)   | 1398          | 620        | +168   | dominado        |
+| V3-opt (§6)     | 1230          | 94         | +0     | dominado        |
+| V1-unroll (§7)  | 1230          | 249        | +0     | dominado        |
+| V1-anneal (§7)  | 1230          | 248        | +0     | dominado        |
+| V1-implicit (§7)| 1230          | 2275       | +0     | dominado        |
+
+**GDPA** es el único método no dominado. Todos los enfoques con surrogate
+V1/V3 (diferenciable o por muestreo) quedan dominados por HOPA o GDPA.
+
+### Conclusiones consolidadas
+
+1. **El surrogate V1 es útil para ranking** (Spearman 0.94/0.978) y para
+   gradientes por diferencias finitas sobre prioridades discretas (V1-FD,
+   +325 sobre DM), pero **no para exploración aleatoria** con un
+   presupuesto fijo de muestras: V1-TopK no supera a HOPA pese a ser un
+   ranker casi perfecto, porque el muestreo no informado no cubre el
+   espacio combinatorio.
+
+2. **Vectorizar V1 no acelera la optimización**: su coste por evaluación
+   es comparable a Holistic-vectorizado (~10 µs/eval con cache, §11). La
+   ventaja observada en §8 era frente a Holistic en Python puro. En
+   régimen vectorizado ambos convergen.
+
+3. **Lo que funciona es el gradiente informado.** GDPA mueve simultáneamente
+   todas las prioridades en la dirección de máximo descenso, usando el
+   gradiente calculado por diferencias finitas vectorizadas sobre Holistic
+   real. El surrogate (V1, V3, softmax) pierde valor frente a la
+   estructura del gradiente.
+
+### Vías restantes
+
+| Vía | Estado | Justificación |
+|-----|--------|---------------|
+| (A) Optimizar GDPA directo | **abierta** | único método no dominado; init, σ-schedule, stop, batch size |
+| (B) V1-TopK (este §12) | **cerrada** | dominado por HOPA |
+| (C) V1-TopK como init de GDPA | abierta |might reducir iteraciones de GDPA si V1 encuentra un buen punto de partida, pero trivial dado el fallo de §12 |
+| Híbrido: escenario caliente transferido | abierta | el cache de Holistic acumula resultados a lo largo del gradiente; mover escenarios entre pasos podría reducir evaluaciones totales |
+| Relajación del orden de prioridades | descartada | §7: la relajación no transfiere al espacio discreto |
