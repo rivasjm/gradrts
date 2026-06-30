@@ -11,6 +11,8 @@ Run from code/ with:
     PYTHONPATH=. python3 workspace/edf_vector_evaluation/eval_all_methods.py
 """
 
+import os
+
 import numpy as np
 from random import Random
 
@@ -165,7 +167,7 @@ if __name__ == "__main__":
         systems=systems,
         utilizations=utilizations,
         threads=threads,
-        output_dir="workspace/edf_vector_evaluation",
+        output_dir=os.path.dirname(os.path.abspath(__file__)),
     )
     runner.run()
 
