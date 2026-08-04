@@ -16,6 +16,39 @@ from model.linear_system_utils import backup_assignment, restore_assignment
 RED = '\033[91m'
 RESET = '\033[0m'
 
+METHOD_COLORS = {
+    "gdpa": "#1f77b4",
+    "gdpa+map": "#ff7f0e",
+    "hopa": "#8c564b",
+    "pd": "#17becf",
+    "bf": "#d62728",
+}
+
+
+def _display_method_label(label):
+    """Normalize evaluation labels for the efficiency chart."""
+    normalized = label.lower()
+    if "mapping" in normalized:
+        return "gdpa+map"
+    if "gdpa" in normalized:
+        return "gdpa"
+    if "hopa" in normalized:
+        return "hopa"
+    if "pd" in normalized:
+        return "pd"
+    if "bf" in normalized:
+        return "bf"
+    return label
+
+
+def _scenario_label(name):
+    normalized = name.lower()
+    if "mapping" in normalized:
+        return "MAP"
+    if "edf" in normalized:
+        return "EDF"
+    return "FP"
+
 class SchedRatioEval:
     """Evaluate schedulability ratios of multiple methods across a range of utilizations.
 
@@ -185,38 +218,46 @@ class SchedRatioEval:
         n_systems = len(self.systems) * len(self.utilizations)
 
         plt.clf()
-        fig, ax = plt.subplots(figsize=(7, 5))
+        fig, ax = plt.subplots(figsize=(7, 5.5))
+        labels = [_display_method_label(label) for label in self.labels]
 
-        colors = plt.cm.tab10(np.linspace(0, 1, len(self.labels)))
-
-        for i, label in enumerate(self.labels):
+        for i, label in enumerate(labels):
+            color = METHOD_COLORS.get(label, plt.cm.tab10(i))
             ax.scatter(total_time[i], total_sched[i],
-                       s=120, color=colors[i], edgecolors='white',
+                       s=180, color=color, edgecolors='white',
                        linewidth=1.5, zorder=5)
-            ax.annotate(label, (total_time[i], total_sched[i]),
-                        textcoords="offset points", xytext=(8, 6),
-                        fontsize=10, fontweight='bold', color=colors[i])
+            is_pd = label == "pd"
+            ax.annotate(
+                label,
+                (total_time[i], total_sched[i]),
+                textcoords="offset points",
+                xytext=(8 if is_pd else -12, 6),
+                fontsize=18,
+                fontweight="bold",
+                color=color,
+                ha="left" if is_pd else "right",
+            )
 
-        ax.set_xlabel('Total execution time (seconds)')
-        ax.set_ylabel(f'Total schedulable systems (out of {n_systems})')
-        ax.set_title(f'{self.name}\nefficiency: schedulability vs computation cost')
-        ax.grid(True, alpha=0.3)
-
-        # Pareto frontier
-        pts = sorted(zip(total_time, total_sched, self.labels),
-                     key=lambda x: (x[0], -x[1]))
-        frontier_x, frontier_y = [], []
-        max_y = -1
-        for tx, ty, _ in pts:
-            if ty > max_y:
-                frontier_x.append(tx)
-                frontier_y.append(ty)
-                max_y = ty
-        if len(frontier_x) >= 2:
-            ax.plot(frontier_x, frontier_y, '--', color='grey',
-                    alpha=0.5, linewidth=1, zorder=1)
+        ax.set_xscale("log")
+        ax.set_ylim(0, max(1000, n_systems))
+        ax.set_xlabel("Total execution time (s)", fontweight="bold", fontsize=18)
+        ax.set_ylabel("Schedulable systems (/1000)", fontweight="bold", fontsize=18)
+        ax.grid(True, which="both", axis="both", alpha=0.3)
+        ax.tick_params(axis="both", labelsize=16)
+        ax.text(
+            0.95,
+            0.05,
+            _scenario_label(self.name),
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontweight="bold",
+            fontsize=18,
+            bbox={"boxstyle": "round", "ec": "black", "fc": "bisque"},
+        )
 
         fig.tight_layout()
         fig.savefig(self._path(f"{self.name}_efficiency.png"))
+        fig.savefig(self._path(f"{self.name}_efficiency.pdf"))
         if self.show:
             plt.show()
