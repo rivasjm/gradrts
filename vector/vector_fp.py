@@ -165,10 +165,10 @@ class PrioritiesMatrix(PriorityScenarios):
 
 
 class VectorHolisticFPAnalysis:
-    def __init__(self, verbose=False, limit_factor=10, cache: ResultsCache = ResultsCache()):
+    def __init__(self, verbose=False, limit_factor=10, cache: ResultsCache = None):
         self.verbose = verbose
         self.limit_factor = limit_factor
-        self.cache = cache
+        self.cache = cache if cache is not None else ResultsCache()
         self._scenarios_response_times = None
         self._full_response_times = None
 
