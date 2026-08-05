@@ -3,12 +3,12 @@ from random import Random
 import numpy as np
 
 from analysis.holistic_local_edf_analysis import HolisticLocalEDFAnalysis
-from assignment.assignments import PDAssignment, EQFAssignment
+from assignment.assignments import PDAssignment
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
-from gradient_descent.gradient_function import AvgSeparationDelta, SequentialGradientFunction
+from gradient_descent.gradient_function import SequentialGradientFunction
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import DeadlineExtractor
 from gradient_descent.stop_functions import ThresholdStopFunction
@@ -26,10 +26,6 @@ def edf_local_pd(system: LinearSystem) -> bool:
     return item(system, PDAssignment(), HolisticLocalEDFAnalysis(limit_factor=1, reset=True))
 
 
-def edf_local_eqf(system: LinearSystem) -> bool:
-    return item(system,  EQFAssignment(), HolisticLocalEDFAnalysis(limit_factor=1, reset=True))
-
-
 def edf_local_hopa(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
     return item(system, HOPAssignment(analysis=analysis), HolisticLocalEDFAnalysis(limit_factor=1, reset=True))
@@ -40,7 +36,7 @@ def edf_local_gdpa(system: LinearSystem) -> bool:
     parameter_handler = DeadlineExtractor()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = SequentialGradientFunction(cost_function=cost_function, sigma=1.5)
+    gradient_function = SequentialGradientFunction(cost_function=cost_function)
     update_function = NoisyAdam()
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                         cost_function=cost_function,
@@ -60,17 +56,17 @@ if __name__ == '__main__':
     n = 50
     systems = [get_system(size, rnd, balanced=True, name=str(i),
                           deadline_factor_min=0.5, sched=SchedulerType.EDF,
-                          deadline_factor_max=1) for i in range(n)]
+                          deadline_factor_max=1,
+                          period_min=100, period_max=100000) for i in range(n)]
 
     # utilizations between 50 % and 90 %
     utilizations = np.linspace(0.5, 0.9, 20)
 
     tools = [("EDF-L PD", edf_local_pd),
-             ("EDF-L EQF", edf_local_eqf),
              ("EDF-L HOPA", edf_local_hopa),
              ("EDF-L GDPA", edf_local_gdpa)]
 
     labels, funcs = zip(*tools)
-    runner = SchedRatioEval("gradient_edf_local_validation", labels=labels, funcs=funcs,
+    runner = SchedRatioEval("gradient_edf_local_eval", labels=labels, funcs=funcs,
                             systems=systems, utilizations=utilizations, threads=6)
     runner.run()

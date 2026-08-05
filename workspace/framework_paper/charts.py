@@ -5,9 +5,9 @@ import matplotlib.ticker as ticker
 import openpyxl
 from collections import defaultdict
 
-FP_EXCEL = "./fp/gradient_fp_validation_schedulables.xlsx"
-EDF_LOCAL_EXCEL = "./edf-local/gradient_edf_local_validation_schedulables.xlsx"
-FP_MAPPING_EXCEL = "./fp-mapping/gradient_fp_mapping_validation_schedulables.xlsx"
+FP_EXCEL = "./fp/gradient_fp_eval_schedulables.xlsx"
+EDF_LOCAL_EXCEL = "./edf-local/gradient_edf_local_eval_schedulables.xlsx"
+FP_MAPPING_EXCEL = "./fp-mapping/gradient_fp_mapping_eval_schedulables.xlsx"
 
 # def add_text(ax, posx, posy, label, size='small', align='center'):
 #     ax.text(posx, posy, label, fontsize=size, ha=align, transform=ax.transAxes,
@@ -27,17 +27,17 @@ def plot_schedulables():
     edfl = pd.read_excel(EDF_LOCAL_EXCEL, index_col=0)
 
     # reorder and select columns
-    fp = fp[['gdpa', 'hopa', 'pd', 'bf']]
-    mapping = mapping[['gdpa-mapping', 'gdpa', 'pd']]
+    fp = fp[['gdpa-vec', 'gdpa-seq', 'hopa', 'pd', 'bf']]
+    mapping = mapping[['gdpa-mapping-vec', 'gdpa-mapping-seq', 'gdpa', 'pd']]
     edfl = edfl[['EDF-L GDPA', 'EDF-L HOPA', 'EDF-L PD']]
 
     # rename columns
-    mapping.rename(columns={'gdpa-mapping':'gdpa+map'}, inplace=True)
-    edfl.rename(columns={'EDF-L GDPA':'gdpa', 'EDF-L HOPA': 'hopa', 'EDF-L PD': 'pd'}, inplace=True)
+    mapping.rename(columns={'gdpa-mapping-vec': 'gdpa+map-vec', 'gdpa-mapping-seq': 'gdpa+map-seq'}, inplace=True)
+    edfl.rename(columns={'EDF-L GDPA': 'gdpa', 'EDF-L HOPA': 'hopa', 'EDF-L PD': 'pd'}, inplace=True)
 
     # prepare chart
     fig, axes = plt.subplots(nrows=1, ncols=3, constrained_layout=True, figsize=(12, 3))
-    styles = ['+-', 'o-', 'x--', 's:', '*-', 'o-']
+    styles = ['+-', 'o-', 'x--', 's:', '*-', 'o-', 'v-', '^--']
 
     # plot
     fp.plot.line(ax=axes[0], style=styles)

@@ -49,7 +49,7 @@ def set_system_utilization(system: LinearSystem, utilization: float):
 
 
 def generate_system(random: Random, n_flows, n_tasks, n_procs, utilization, sched: SchedulerType,
-                    period_min, period_max, deadline_factor_min, deadline_factor_max,
+                    period_min=100, period_max=100000, deadline_factor_min=0.5, deadline_factor_max=1,
                     balanced=False) -> LinearSystem:
     system = LinearSystem()
     procs = [Processor(name=f"proc{i}", sched=sched) for i in range(n_procs)]

@@ -24,7 +24,7 @@ class HOPAssignment(AnalysisFunction):
 
     @staticmethod
     def default_k_pairs():
-        return [(2.0, 2.0), (1.8, 1.8), (3.0, 3.0), (1.5, 1.5)]
+        return [(1.0, 1.0), (1.8, 1.8), (3.0, 3.0), (1.5, 1.5)]
 
     def apply(self, system: LinearSystem):
         self.exec_time.init()

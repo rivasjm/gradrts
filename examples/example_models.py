@@ -66,7 +66,8 @@ def get_three_tasks() -> LinearSystem:
 
 
 def get_system(size, random=Random(), utilization=0.5, balanced=False, name=None,
-               deadline_factor_min=0.5, deadline_factor_max=1, sched: SchedulerType = SchedulerType.FP) -> LinearSystem:
+               deadline_factor_min=0.5, deadline_factor_max=1, sched: SchedulerType = SchedulerType.FP,
+               period_min=100, period_max=100000) -> LinearSystem:
     n_flows, t_tasks, n_procs = size
     system = generate_system(random,
                              n_flows=n_flows,
@@ -74,8 +75,8 @@ def get_system(size, random=Random(), utilization=0.5, balanced=False, name=None
                              n_procs=n_procs,
                              utilization=utilization,
                              sched=sched,
-                             period_min=100,
-                             period_max=100 * 3,
+                             period_min=period_min,
+                             period_max=period_max,
                              deadline_factor_min=deadline_factor_min,
                              deadline_factor_max=deadline_factor_max,
                              balanced=balanced)
