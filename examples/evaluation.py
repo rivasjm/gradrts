@@ -260,7 +260,6 @@ class SchedRatioEval:
 
         fig.tight_layout()
         fig.savefig(self._path(f"{self.name}_efficiency.png"))
-        fig.savefig(self._path(f"{self.name}_efficiency.pdf"))
         if self.show:
             plt.show()
         plt.close(fig)

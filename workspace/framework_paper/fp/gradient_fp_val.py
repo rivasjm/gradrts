@@ -111,7 +111,7 @@ if __name__ == '__main__':
 
     # create population of examples
     rnd = Random(42)
-    size = (3, 5, 3)  # flows, tasks, procs
+    size = (5, 3, 3)  # flows, tasks, procs
     n = 50
     systems = [get_system(size, rnd, balanced=True, name=str(i),
                           deadline_factor_min=0.5,
@@ -126,9 +126,7 @@ if __name__ == '__main__':
         ("gdpa-seq", gdpa_pd_fp_seq),
         ("hopa", hopa_fp),
         ("pd", pd_fp),
-        ("bf", bf_fp),
-        ("eqs", eqs_fp),
-        ("eqf", eqf_fp)
+        ("bf", bf_fp)
     ]
 
     labels, funcs = zip(*tools)
