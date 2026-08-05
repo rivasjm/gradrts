@@ -1,4 +1,5 @@
 import sys
+import math
 
 from assignment.assignments import PDAssignment
 from model.analysis_function import globalize_deadlines, extract_assignment, insert_assignment, calculate_priorities, \
@@ -116,8 +117,8 @@ class HOPAssignment(AnalysisFunction):
     @staticmethod
     def save_local_deadline(task: Task, ka, kr):
         mex_pr = task.flow.system.mex_pr
-        second = 1 + task.processor.excess/(kr * mex_pr) if kr * mex_pr != 0 else sys.float_info.max
-        third = 1 + task.excess/(ka * task.flow.excess) if ka * task.flow.excess != 0 else sys.float_info.max
+        second = 1 + task.processor.excess/(kr * mex_pr) if kr * mex_pr != 0 else 1
+        third = 1 + task.excess/(ka * task.flow.excess) if ka * task.flow.excess != 0 else 1
         task.deadline = task.deadline * second * third
 
     @staticmethod
@@ -158,6 +159,8 @@ class HOPAssignment(AnalysisFunction):
     def adjust_local_deadlines(system: LinearSystem):
         for flow in system.flows:
             d_sum = sum([task.deadline for task in flow])
+            if not math.isfinite(d_sum) or d_sum <= 0:
+                continue
             for task in flow:
                 task.deadline = task.deadline * flow.deadline / d_sum
 

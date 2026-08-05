@@ -185,6 +185,7 @@ class SchedRatioEval:
             fig.savefig(self._path(f"{label}.png"))
         if show:
             plt.show()
+        plt.close(fig)
 
     def _bar_chart(self, label, data, ylabel, save=True, show=True):
         plt.clf()
@@ -204,6 +205,7 @@ class SchedRatioEval:
             fig.savefig(self._path(f"{label}_summary.png"))
         if show:
             plt.show()
+        plt.close(fig)
 
     def _excel(self, label, data):
         df = pd.DataFrame(data=data,
@@ -261,3 +263,4 @@ class SchedRatioEval:
         fig.savefig(self._path(f"{self.name}_efficiency.pdf"))
         if self.show:
             plt.show()
+        plt.close(fig)
