@@ -52,7 +52,7 @@ def edf_local_gdpa(system: LinearSystem) -> bool:
 if __name__ == '__main__':
     # create population of examples
     rnd = Random(42)
-    size = (3, 4, 3)  # flows, tasks, procs
+    size = (5, 3, 3)  # flows, tasks, procs
     n = 50
     systems = [get_system(size, rnd, balanced=True, name=str(i),
                           deadline_factor_min=0.5, sched=SchedulerType.EDF,
@@ -62,9 +62,9 @@ if __name__ == '__main__':
     # utilizations between 50 % and 90 %
     utilizations = np.linspace(0.5, 0.9, 20)
 
-    tools = [("EDF-L PD", edf_local_pd),
-             ("EDF-L HOPA", edf_local_hopa),
-             ("EDF-L GDPA", edf_local_gdpa)]
+    tools = [("pd", edf_local_pd),
+             ("hopa", edf_local_hopa),
+             ("gdpa", edf_local_gdpa)]
 
     labels, funcs = zip(*tools)
     runner = SchedRatioEval("gradient_edf_local_eval", labels=labels, funcs=funcs,
