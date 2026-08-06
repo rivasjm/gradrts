@@ -1,3 +1,5 @@
+import argparse
+import os
 from random import Random
 
 import numpy as np
@@ -50,9 +52,14 @@ def edf_local_gdpa(system: LinearSystem) -> bool:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Gradient EDF local validation")
+    parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
+                        help="Output directory for generated files (default: script directory)")
+    args = parser.parse_args()
+
     # create population of examples
     rnd = Random(42)
-    size = (5, 3, 3)  # flows, tasks, procs
+    size = (3, 4, 3)  # flows, tasks, procs
     n = 50
     systems = [get_system(size, rnd, balanced=True, name=str(i),
                           deadline_factor_min=0.5, sched=SchedulerType.EDF,
@@ -68,5 +75,6 @@ if __name__ == '__main__':
 
     labels, funcs = zip(*tools)
     runner = SchedRatioEval("gradient_edf_local_eval", labels=labels, funcs=funcs,
-                            systems=systems, utilizations=utilizations, threads=6)
+                            systems=systems, utilizations=utilizations, threads=6,
+                            output_dir=args.output_dir)
     runner.run()
