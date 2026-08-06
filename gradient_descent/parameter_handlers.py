@@ -6,7 +6,7 @@ import math
 class DeadlineExtractor(ParameterHandler):
     def extract(self, system: LinearSystem) -> [float]:
         max_d = max([task.deadline for task in system.tasks])
-        x = [t.deadline/max_d for t in system.tasks]
+        x = [math.log(1 + t.deadline) / math.log(1 + max_d) for t in system.tasks]
         return x
 
     def insert(self, system: LinearSystem, x: [float]):
@@ -14,7 +14,7 @@ class DeadlineExtractor(ParameterHandler):
         tasks = system.tasks
         assert len(tasks) == len(x)
         for v, t in zip(x, tasks):
-            t.deadline = max(v, 1e-9)*max_d
+            t.deadline = (1 + max_d) ** min(max(v, 0.0), 1.0) - 1
 
 
 class PriorityExtractor(ParameterHandler):
