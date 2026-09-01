@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     # create population of examples
     rnd = Random(42)
-    size = (3, 4, 3)  # flows, tasks, procs
+    size = (5, 3, 3)  # flows, tasks, procs
     n = 50
     systems = [get_system(size, rnd, balanced=True, name=str(i),
                           deadline_factor_min=0.5, sched=SchedulerType.EDF,
