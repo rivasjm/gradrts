@@ -1,4 +1,5 @@
 import math
+import time
 
 from model.analysis_function import reset_wcrt, init_wcrt, LimitFactorReachedException, AnalysisFunction
 from model.linear_system import Task, LinearSystem, SchedulerType, is_scheduler_type
@@ -10,10 +11,12 @@ class HolisticLocalEDFAnalysis(AnalysisFunction):
     with Local EDF Scheduling
     """
 
-    def __init__(self, limit_factor=10, reset=True, verbose=False):
+    def __init__(self, limit_factor=10, reset=True, verbose=False, max_time=None):
         self.limit_factor = limit_factor
         self.reset = reset
         self.verbose = verbose
+        self.max_time = max_time
+        self._start = None
 
     @staticmethod
     def _wi(task: Task, t: float, D: float) -> float:
@@ -35,20 +38,20 @@ class HolisticLocalEDFAnalysis(AnalysisFunction):
             return cls._busy_period(task, length)
 
     @classmethod
-    def _build_set_psi(cls, task: Task, busy_period: float, p: int):
-        # eq (4) [adapted from Mast implementation]
+    def _build_set_psi_ij(cls, task: Task, busy_period: float):
+        # eq (4) [adapted from Mast implementation] -- release points of interfering tasks
         tasks = [t for t in task.processor.tasks if t != task]
-        psi_ij = {(p - 1) * t.period - t.jitter + t.deadline
-                  for t in tasks for p in range(1, math.ceil((busy_period + t.jitter) / t.period) + 1)
-                  if (p - 1) * t.period - t.jitter >= 0}
+        psi_ij = {(q - 1) * t.period - t.jitter + t.deadline
+                  for t in tasks for q in range(1, math.ceil((busy_period + t.jitter) / t.period) + 1)
+                  if (q - 1) * t.period - t.jitter >= 0}
         psi_ij |= {t.deadline for t in tasks}
+        return psi_ij
 
-        # Eq (6)
-        psi_ab = {(p - 1) * task.period + task.deadline
-                  for p in range(1, math.ceil(busy_period / task.period) + 1)}
-
-        set_psi = psi_ij | psi_ab
-        return set_psi
+    @classmethod
+    def _build_set_psi_ab(cls, task: Task, busy_period: float, p: int):
+        # Eq (6) -- release points of the analyzed task for index p
+        return {(p - 1) * task.period + task.deadline
+                for p in range(1, math.ceil(busy_period / task.period) + 1)}
 
     @staticmethod
     def _ra(task, psi, wab):
@@ -73,6 +76,7 @@ class HolisticLocalEDFAnalysis(AnalysisFunction):
             return
 
         init_wcrt(system)
+        self._start = time.perf_counter()
         try:
             while True:
                 changed = False
@@ -92,10 +96,18 @@ class HolisticLocalEDFAnalysis(AnalysisFunction):
 
     def _task_analysis(self, task: Task) -> bool:
         """task: task under analysis"""
+        if self._timeout():
+            raise LimitFactorReachedException(task, task.wcrt or 0, float("inf"))
         length = self._busy_period(task, task.wcet)
         max_r = 0
+        # psi_ij (release points of interfering tasks) does not depend on p;
+        # compute once and reuse across the p-loop.
+        psi_ij = self._build_set_psi_ij(task, length)
         for p in range(1, math.ceil(length / task.period) + 1):
-            psi_set = {psi for psi in self._build_set_psi(task, length, p) if
+            if self._timeout():
+                raise LimitFactorReachedException(task, max_r or task.wcrt or 0, float("inf"))
+            psi_ab = self._build_set_psi_ab(task, length, p)
+            psi_set = {psi for psi in (psi_ij | psi_ab) if
                        (p - 1) * task.period + task.deadline <= psi < p * task.period + task.deadline}
             for psi in psi_set:
                 w = self._wab(task, psi, p, p * task.wcet)  # converges to a w value
@@ -110,3 +122,6 @@ class HolisticLocalEDFAnalysis(AnalysisFunction):
             return True
         else:
             return False
+
+    def _timeout(self) -> bool:
+        return self.max_time is not None and time.perf_counter() - self._start > self.max_time
