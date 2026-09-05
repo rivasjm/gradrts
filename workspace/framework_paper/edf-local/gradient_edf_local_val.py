@@ -64,7 +64,7 @@ if __name__ == '__main__':
     systems = [get_system(size, rnd, balanced=True, name=str(i),
                           deadline_factor_min=0.5, sched=SchedulerType.EDF,
                           deadline_factor_max=1,
-                          period_min=100, period_max=100000) for i in range(n)]
+                          period_min=100, period_max=1000) for i in range(n)]
 
     # utilizations between 50 % and 90 %
     utilizations = np.linspace(0.5, 0.9, 20)
