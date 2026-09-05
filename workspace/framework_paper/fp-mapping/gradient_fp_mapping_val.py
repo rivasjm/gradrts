@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import os
+from functools import partial
 
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from random import Random
@@ -32,29 +33,26 @@ def pd_fp(system: LinearSystem) -> bool:
     return system.is_schedulable()
 
 
-def gdpa_mapping_fp(limit: int):
-    def gdpa(system: LinearSystem) -> bool:
-        analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-        parameter_handler = MappingPriorityExtractor()
-        cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
-        stop_function = ThresholdStopFunction(limit=limit)
-        gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix())
+def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
+    parameter_handler = MappingPriorityExtractor()
+    cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
+    stop_function = ThresholdStopFunction(limit=limit)
+    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix())
 
-        update_function = NoisyAdam()
-        optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
-                                             cost_function=cost_function,
-                                             stop_function=stop_function,
-                                             gradient_function=gradient_function,
-                                             update_function=update_function,
-                                             verbose=False)
+    update_function = NoisyAdam()
+    optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
+                                         cost_function=cost_function,
+                                         stop_function=stop_function,
+                                         gradient_function=gradient_function,
+                                         update_function=update_function,
+                                         verbose=False)
 
-        pd = PDAssignment(normalize=True)
-        pd.apply(system)
-        optimizer.apply(system)
-        HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
-        return system.is_schedulable()
-
-    return gdpa
+    pd = PDAssignment(normalize=True)
+    pd.apply(system)
+    optimizer.apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
 
 
 if __name__ == '__main__':
@@ -78,9 +76,9 @@ if __name__ == '__main__':
     tools = [
         ("pd", pd_fp),
         ("hopa", hopa_fp),
-        ("gdpa-50", gdpa_mapping_fp(limit=50)),
-        ("gdpa-100", gdpa_mapping_fp(limit=100)),
-        ("gdpa-200", gdpa_mapping_fp(limit=200)),
+        ("gdpa-50", partial(gdpa_mapping_fp, limit=50)),
+        ("gdpa-100", partial(gdpa_mapping_fp, limit=100)),
+        ("gdpa-200", partial(gdpa_mapping_fp, limit=200)),
     ]
 
     labels, funcs = zip(*tools)
