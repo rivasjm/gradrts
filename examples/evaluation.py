@@ -181,6 +181,18 @@ class SchedRatioEval:
     def _path(self, filename):
         return os.path.join(self.output_dir, filename)
 
+    def _annotate_footer(self, ax):
+        """Annotate eval name (left) and elapsed time (right) below the axes."""
+        ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
+        time_label = f"{time.time() - self.start:.2f} seconds"
+        ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
+
+    def _finish(self, fig, filename):
+        """Tight layout, save into output_dir and close the figure."""
+        fig.tight_layout()
+        fig.savefig(self._path(filename))
+        plt.close(fig)
+
     def _line_chart(self, label, data, ylabel):
         plt.clf()
         df = pd.DataFrame(data=data,
@@ -190,16 +202,8 @@ class SchedRatioEval:
         df.plot(ax=ax)
         ax.set_ylabel(ylabel)
         ax.set_xlabel("Average utilization")
-
-        # print system size
-        ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
-
-        # register execution vector_times
-        time_label = f"{time.time() - self.start:.2f} seconds"
-        ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
-        fig.tight_layout()
-        fig.savefig(self._path(f"{label}.png"))
-        plt.close(fig)
+        self._annotate_footer(ax)
+        self._finish(fig, f"{label}.png")
 
     def _bar_chart(self, label, data, ylabel):
         plt.clf()
@@ -207,16 +211,8 @@ class SchedRatioEval:
         fig, ax = plt.subplots()
         df.sum().plot.barh(ax=ax)
         ax.tick_params(axis='both', which='major', labelsize=6)
-
-        # print system size
-        ax.annotate(self.name, xy=(0, -0.1), xycoords='axes fraction', ha='left', va="center", fontsize=8)
-
-        # register execution vector_times
-        time_label = f"{time.time() - self.start:.2f} seconds"
-        ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
-        fig.tight_layout()
-        fig.savefig(self._path(f"{label}_summary.png"))
-        plt.close(fig)
+        self._annotate_footer(ax)
+        self._finish(fig, f"{label}_summary.png")
 
     def _excel(self, label, data):
         df = pd.DataFrame(data=data,
@@ -271,7 +267,4 @@ class SchedRatioEval:
             fontsize=18,
             bbox={"boxstyle": "round", "ec": "black", "fc": "bisque"},
         )
-
-        fig.tight_layout()
-        fig.savefig(self._path(f"{self.name}_efficiency.png"))
-        plt.close(fig)
+        self._finish(fig, f"{self.name}_efficiency.png")
