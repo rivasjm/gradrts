@@ -76,12 +76,12 @@ class SchedRatioEval:
         Sets utilization on a system. Default: ``set_utilization(system, u)``.
     output_dir : str, optional
         Directory for output files. Default: current working directory.
-    show : bool, default False
-        If True, display live-updating charts during the sweep (non-blocking).
     """
+    FORMATS = ("line", "bar", "xlsx")
+
     def __init__(self, name, labels, funcs, systems, utilizations, threads,
                  preprocessor=None, utilization_func=set_utilization,
-                 output_dir=None, show=False):
+                 output_dir=None):
         assert len(labels) == len(funcs)
         self.name = name
         self.labels = labels
@@ -93,19 +93,21 @@ class SchedRatioEval:
         self.utilization_func = utilization_func
         self.start = None
         self.output_dir = output_dir or os.getcwd()
-        self.show = show
-        self._figs = {}
 
     def run(self):
         """Run the full evaluation sweep. Generates PNG and XLSX files in output_dir.
 
-        If show=True, live-updating charts are displayed without blocking."""
+        Reports:
+        - ``schedulables``: number of schedulable systems per method/utilization.
+        - ``times``: average execution time over all systems.
+        - ``times_success``: average execution time over the systems each method
+          made schedulable (undefined -> NaN where no system succeeded).
+        """
         self.start = time.time()
-        if self.show:
-            plt.ion()
         job = 0
         all_results = np.zeros((len(self.utilizations), len(self.labels)))
         all_times = np.zeros((len(self.utilizations), len(self.labels)))
+        all_success_times = np.zeros((len(self.utilizations), len(self.labels)))
 
         for u_index, u in enumerate(self.utilizations):
             for s in self.systems:
@@ -115,26 +117,34 @@ class SchedRatioEval:
 
             with Pool(self.threads) as pool:
                 f = partial(self._step, u_index=u_index)
-                for scheds, times in pool.imap_unordered(f, self.systems):
+                for scheds, times, success_times in pool.imap_unordered(f, self.systems):
                     job += 1
                     all_results[u_index, :] += scheds
                     all_times[u_index, :] += times
+                    all_success_times[u_index, :] += success_times
                     print(f"{datetime.now()} : u={u} job={job}")
 
-            self._save(all_results, "schedulables", self.show)
-            self._save(all_times / len(self.systems), "times", False)
+            self._save(all_results, "schedulables")
+            self._save(all_times / len(self.systems), "times", formats=("xlsx",))
+            self._save(self._success_mean(all_success_times, all_results),
+                       "times_success", formats=("xlsx",))
 
-        # Aggregate efficiency scatter (total schedulable vs total time)
-        self._efficiency_chart(all_results, all_times)
+            # Aggregate efficiency scatter (total schedulable vs success time),
+            # regenerated after each utilization with the data so far
+            self._efficiency_chart(all_results, all_success_times)
 
-        if self.show:
-            plt.ioff()
-            plt.close("all")
+    @staticmethod
+    def _success_mean(success_times, counts):
+        """Mean time over successful runs only; NaN where a method never succeeded."""
+        mean = np.full_like(success_times, np.nan)
+        np.divide(success_times, counts, out=mean, where=counts > 0)
+        return mean
 
     def _step(self, system: LinearSystem, u_index: int):
         """Make sure I leave the system in the same state as before"""
         results = np.zeros(len(self.funcs), dtype=np.int8)
         times = np.zeros(len(self.funcs), dtype=np.single)
+        success_times = np.zeros(len(self.funcs), dtype=np.single)
         a = backup_assignment(system)
         for f, func in enumerate(self.funcs):
             try:
@@ -145,26 +155,33 @@ class SchedRatioEval:
                 restore_assignment(system, a)
                 if sched:
                     results[f] = 1
+                    success_times[f] = after - before
                 times[f] = after - before
             except Exception as e:
                 print(f"{RED}Error in {self.labels[f]}, system={system.name}\n{e}{RESET}")
                 restore_assignment(system, a)
                 results[f] = 0
                 times[f] = 0
-        return results, times
+        return results, times, success_times
 
-    def _save(self, data, suffix, show):
+    def _save(self, data, suffix, formats=FORMATS):
+        """Save ``data`` as the selected files: ``"line"`` (line chart PNG),
+        ``"bar"`` (summary bar chart PNG) and ``"xlsx"`` (spreadsheet)."""
+        for fmt in formats:
+            assert fmt in self.FORMATS, f"unknown format {fmt!r}, use {self.FORMATS}"
         label = f"{self.name}_{suffix}"
         length = len(self.utilizations)
-        if length > 1:
-            self._line_chart(label, data, ylabel=suffix, save=True, show=show)
-        self._bar_chart(label, data, ylabel=suffix, save=True, show=length == 1 and show)
-        self._excel(label, data)
+        if "line" in formats and length > 1:
+            self._line_chart(label, data, ylabel=suffix)
+        if "bar" in formats:
+            self._bar_chart(label, data, ylabel=suffix)
+        if "xlsx" in formats:
+            self._excel(label, data)
 
     def _path(self, filename):
         return os.path.join(self.output_dir, filename)
 
-    def _line_chart(self, label, data, ylabel, save=True, show=True):
+    def _line_chart(self, label, data, ylabel):
         plt.clf()
         df = pd.DataFrame(data=data,
                           index=self.utilizations,
@@ -181,13 +198,10 @@ class SchedRatioEval:
         time_label = f"{time.time() - self.start:.2f} seconds"
         ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
         fig.tight_layout()
-        if save:
-            fig.savefig(self._path(f"{label}.png"))
-        if show:
-            plt.show()
+        fig.savefig(self._path(f"{label}.png"))
         plt.close(fig)
 
-    def _bar_chart(self, label, data, ylabel, save=True, show=True):
+    def _bar_chart(self, label, data, ylabel):
         plt.clf()
         df = pd.DataFrame(data=data, columns=self.labels)
         fig, ax = plt.subplots()
@@ -201,10 +215,7 @@ class SchedRatioEval:
         time_label = f"{time.time() - self.start:.2f} seconds"
         ax.annotate(time_label, xy=(1, -0.1), xycoords='axes fraction', ha='right', va="center", fontsize=8)
         fig.tight_layout()
-        if save:
-            fig.savefig(self._path(f"{label}_summary.png"))
-        if show:
-            plt.show()
+        fig.savefig(self._path(f"{label}_summary.png"))
         plt.close(fig)
 
     def _excel(self, label, data):
@@ -213,10 +224,13 @@ class SchedRatioEval:
                           columns=self.labels)
         df.to_excel(self._path(f"{label}.xlsx"))
 
-    def _efficiency_chart(self, results, times):
-        """Scatter plot: total schedulable vs total execution time per method."""
+    def _efficiency_chart(self, results, success_times):
+        """Scatter plot: total schedulable vs total success time per method.
+
+        Uses the accumulated success-time sums, so it is regenerated after
+        each utilization with the data computed so far."""
         total_sched = results.sum(axis=0)
-        total_time = times.sum(axis=0)
+        total_time = success_times.sum(axis=0)
         n_systems = len(self.systems) * len(self.utilizations)
 
         plt.clf()
@@ -242,7 +256,7 @@ class SchedRatioEval:
 
         ax.set_xscale("log")
         ax.set_ylim(0, max(1000, n_systems))
-        ax.set_xlabel("Total execution time (s)", fontweight="bold", fontsize=18)
+        ax.set_xlabel("Total success time (s)", fontweight="bold", fontsize=18)
         ax.set_ylabel("Schedulable systems (/1000)", fontweight="bold", fontsize=18)
         ax.grid(True, which="both", axis="both", alpha=0.3)
         ax.tick_params(axis="both", labelsize=16)
@@ -260,6 +274,4 @@ class SchedRatioEval:
 
         fig.tight_layout()
         fig.savefig(self._path(f"{self.name}_efficiency.png"))
-        if self.show:
-            plt.show()
         plt.close(fig)
