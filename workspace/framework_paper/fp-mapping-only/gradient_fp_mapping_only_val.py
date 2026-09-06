@@ -81,5 +81,5 @@ if __name__ == '__main__':
     runner = SchedRatioEval("gradient_fp_mapping_only_balanced_validation", labels=labels, funcs=funcs,
                             # preprocessor=unbalance_contended,
                             systems=systems, utilizations=utilizations, threads=8,
-                            output_dir=args.output_dir, show=False)
+                            output_dir=args.output_dir)
     runner.run()

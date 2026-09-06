@@ -132,5 +132,5 @@ if __name__ == '__main__':
     labels, funcs = zip(*tools)
     runner = SchedRatioEval("gradient_fp_eval", labels=labels, funcs=funcs,
                             systems=systems, utilizations=utilizations, threads=8,
-                            output_dir=args.output_dir, show=False)
+                            output_dir=args.output_dir)
     runner.run()

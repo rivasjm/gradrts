@@ -128,7 +128,6 @@ def main():
         utilizations=utilizations,
         threads=args.threads,
         output_dir=args.output_dir,
-        show=False,
     )
     evaluator.run()
 
