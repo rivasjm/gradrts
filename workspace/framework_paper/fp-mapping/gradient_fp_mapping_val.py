@@ -56,6 +56,7 @@ def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
 
 
 if __name__ == '__main__':
+    eval_name = "gradient_fp_mapping_eval"
     parser = argparse.ArgumentParser(description="Gradient FP+mapping validation")
     parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
                         help="Output directory for generated files (default: script directory)")
@@ -82,8 +83,10 @@ if __name__ == '__main__':
     ]
 
     labels, funcs = zip(*tools)
-    runner = SchedRatioEval("gradient_fp_mapping_eval", labels=labels, funcs=funcs,
+    output_dir = os.path.join(args.output_dir, eval_name)
+    os.makedirs(output_dir, exist_ok=True)
+    runner = SchedRatioEval(eval_name, labels=labels, funcs=funcs,
                             # preprocessor=unbalance_contended,
                             systems=systems, utilizations=utilizations, threads=6,
-                            output_dir=args.output_dir)
+                            output_dir=output_dir)
     runner.run()
