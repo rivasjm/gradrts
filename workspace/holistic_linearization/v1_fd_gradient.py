@@ -68,7 +68,7 @@ class V1FiniteDifferenceGradient(GradientFunction):
     """Central finite-difference gradient using V1 surrogate.
 
     Perturbs the *x* vector (sigmoid-squashed priorities, as produced by
-    ``PriorityExtractor``) by ``±eps``, runs V1 analysis on each perturbed
+    ``FPHandler``) by ``±eps``, runs V1 analysis on each perturbed
     configuration, and returns the gradient in *x*-space.
 
     Parameters
@@ -84,13 +84,13 @@ class V1FiniteDifferenceGradient(GradientFunction):
         self.limit_factor = limit_factor
 
     def compute(self, system: LinearSystem, x: list[float]) -> list[float]:
-        from gradient_descent.parameter_handlers import PriorityExtractor
+        from gradient_descent.parameter_handlers import FPHandler
 
         tasks = system.tasks
         n = len(tasks)
         grad = [0.0] * n
 
-        extractor = PriorityExtractor()
+        extractor = FPHandler()
 
         # Insert base x
         extractor.insert(system, x)

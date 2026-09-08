@@ -12,7 +12,7 @@ from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import SequentialGradientFunction
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import DeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem, SchedulerType
@@ -35,7 +35,7 @@ def edf_local_hopa(system: LinearSystem) -> bool:
 
 def edf_local_gdpa(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False, max_time=None)
-    parameter_handler = DeadlineExtractor()
+    parameter_handler = DeadlineHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100, max_time=None)
     gradient_function = SequentialGradientFunction(cost_function=cost_function)

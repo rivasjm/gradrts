@@ -18,7 +18,7 @@ from gradient_descent.gradient_function import (
     SequentialGradientFunction,
     gradient_inputs_from_deltas,
 )
-from gradient_descent.parameter_handlers import DeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler
 from model.linear_system import LinearSystem, SchedulerType
 from model.linear_system_utils import backup_assignment, restore_assignment
 from surrogate.surrogate_edf import (
@@ -39,7 +39,7 @@ def compare_wcrts(system: LinearSystem, tau=0.5, N_w=10):
     real_wcrts = np.array([t.wcrt for t in system.tasks])
 
     *_, max_d = _build_system_tensors(system)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     x = ph.extract(system)
     s = torch.tensor(x, dtype=torch.float64, requires_grad=True)
 
@@ -68,7 +68,7 @@ def compare_wcrts(system: LinearSystem, tau=0.5, N_w=10):
 def compare_gradients(system: LinearSystem, tau=0.5, N_w=10, fd_sigma=1.5):
     """Compare surrogate gradient direction with finite-difference gradient."""
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False, verbose=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
 
     x = ph.extract(system)
@@ -106,7 +106,7 @@ def test_optimization(system: LinearSystem, tau=0.5, N_w=10, max_iters=50):
     from model.linear_system_utils import backup_assignment, restore_assignment
 
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     stop_fn = FixedIterationsStop(iterations=max_iters)
     grad_fn = SurrogateEDFGradient(tau=tau, N_w=N_w, N_jitter=2, M_psi=50)

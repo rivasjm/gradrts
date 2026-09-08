@@ -3,7 +3,7 @@ from model.linear_system import LinearSystem
 import math
 
 
-class DeadlineExtractor(ParameterHandler):
+class DeadlineHandler(ParameterHandler):
     def extract(self, system: LinearSystem) -> [float]:
         max_d = max([flow.deadline for flow in system.flows])
         x = [sigmoid(t.deadline / max_d) for t in system.tasks]
@@ -17,7 +17,7 @@ class DeadlineExtractor(ParameterHandler):
             t.deadline = v * max_d                   
 
 
-class PriorityExtractor(ParameterHandler):
+class FPHandler(ParameterHandler):
     def extract(self, system: LinearSystem) -> [float]:
         # max_priority = max(map(lambda t: t.priority, system.tasks))
         r = [sigmoid(t.priority) for t in system.tasks]
@@ -30,16 +30,16 @@ class PriorityExtractor(ParameterHandler):
             t.priority = v
 
 
-class MappingPriorityExtractor(ParameterHandler):
+class FPMappingHandler(ParameterHandler):
     def __init__(self):
-        self.prio_extractor = PriorityExtractor()
+        self.fp_handler = FPHandler()
 
     def reset(self):
-        self.prio_extractor.reset()
+        self.fp_handler.reset()
 
     def extract(self, S: LinearSystem) -> [float]:
         m_vector = [0.55 if task.processor == proc else 0.45 for task in S.tasks for proc in S.processors]
-        p_vector = self.prio_extractor.extract(S)
+        p_vector = self.fp_handler.extract(S)
         return m_vector + p_vector
 
     def insert(self, S: LinearSystem, x: [float]) -> None:
@@ -56,19 +56,19 @@ class MappingPriorityExtractor(ParameterHandler):
             tasks[i].processor = procs[proc_index]
 
         # parse priority values (last t values)
-        self.prio_extractor.insert(S, x[-t:])
+        self.fp_handler.insert(S, x[-t:])
 
 
-class MappingDeadlineExtractor(ParameterHandler):
+class DeadlineMappingHandler(ParameterHandler):
     def __init__(self):
-        self.deadline_extractor = DeadlineExtractor()
+        self.deadline_handler = DeadlineHandler()
 
     def reset(self):
-        self.deadline_extractor.reset()
+        self.deadline_handler.reset()
 
     def extract(self, S: LinearSystem) -> [float]:
         m_vector = [0.55 if task.processor == proc else 0.45 for task in S.tasks for proc in S.processors]
-        t_vector = self.deadline_extractor.extract(S)
+        t_vector = self.deadline_handler.extract(S)
         return m_vector + t_vector
 
     def insert(self, S: LinearSystem, x: [float]) -> None:
@@ -85,10 +85,10 @@ class MappingDeadlineExtractor(ParameterHandler):
             tasks[i].processor = procs[proc_index]
 
         # parse priority values (last t values)
-        self.deadline_extractor.insert(S, x[-t:])
+        self.deadline_handler.insert(S, x[-t:])
 
 
-class MappingOnlyExtractor(ParameterHandler):
+class MappingHandler(ParameterHandler):
     def extract(self, S: LinearSystem) -> [float]:
         return [0.55 if task.processor == proc else 0.45
                 for task in S.tasks for proc in S.processors]

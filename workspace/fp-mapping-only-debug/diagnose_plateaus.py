@@ -15,7 +15,7 @@ from examples.example_models import get_system
 from examples.generator import set_utilization
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import MappingOnlyExtractor
+from gradient_descent.parameter_handlers import MappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
@@ -118,7 +118,7 @@ def run_diagnostic(system_name="diag", utilization=0.6, seed=42,
     print()
 
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    parameter_handler = MappingOnlyExtractor()
+    parameter_handler = MappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=limit, patience=patience)
     gradient_function = VectorFPGradientFunction(

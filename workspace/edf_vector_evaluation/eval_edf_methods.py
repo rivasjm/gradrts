@@ -17,7 +17,7 @@ from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import SequentialGradientFunction
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import DeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem, SchedulerType
@@ -37,7 +37,7 @@ def edf_pd(system: LinearSystem) -> bool:
 
 def edf_gdpa_surr(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     stop_fn = ThresholdStopFunction(limit=200, patience=50)
     grad_fn = SurrogateEDFGradient(tau=0.05, N_w=10, N_jitter=2, M_psi=50,
@@ -56,7 +56,7 @@ def edf_gdpa_surr(system: LinearSystem) -> bool:
 
 def edf_gdpa_vec(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     stop_fn = ThresholdStopFunction(limit=50, patience=15)
     grad_fn = VectorEDFGradientFunction(sigma=1.5, M_psi=100, cost_limit_factor=10)
@@ -74,7 +74,7 @@ def edf_gdpa_vec(system: LinearSystem) -> bool:
 
 def edf_gdpa_seq(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     stop_fn = ThresholdStopFunction(limit=50, patience=15)
     grad_fn = SequentialGradientFunction(cost_function=cost_fn, sigma=1.5)

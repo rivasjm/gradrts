@@ -10,7 +10,7 @@ from examples.example_models import get_system
 from examples.generator import unbalance_contended, set_utilization
 from examples.tuner import GradientHyperTuner
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import MappingOnlyExtractor
+from gradient_descent.parameter_handlers import MappingHandler
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
@@ -19,7 +19,7 @@ from vector.vector_fp import VectorFPGradientFunction, MappingOnlyMatrix
 
 def build_optimizer(lr, sigma, gamma, beta1, beta2, epsilon, patience, cost_limit_factor):
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    handler = MappingOnlyExtractor()
+    handler = MappingHandler()
     cost = InvslackCost(parameter_handler=handler, analysis=analysis)
     stop = ThresholdStopFunction(limit=100, patience=patience)
     grad = VectorFPGradientFunction(
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     print(f"Started:  {datetime.now()}")
     print(f"CLI args: threads={args.threads}, top_n={args.top_n}, output_dir={args.output_dir}")
     print(f"Scenario: fp-mapping-only, target_utilization={utilization}")
-    print(f"Modules:  MappingOnlyExtractor, InvslackCost, ThresholdStopFunction")
+    print(f"Modules:  MappingHandler, InvslackCost, ThresholdStopFunction")
     print(f"          VectorFPGradientFunction(MappingOnlyMatrix), NoisyAdam")
     print(f"Setup:    PDAssignment(normalize=True), unbalance_contended, set_utilization={utilization}")
     print()

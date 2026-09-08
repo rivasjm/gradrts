@@ -26,7 +26,7 @@ from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import PriorityExtractor
+from gradient_descent.parameter_handlers import FPHandler
 from gradient_descent.stop_functions import ThresholdStopFunction, FixedIterationsStop
 from gradient_descent.update_functions import NoisyAdam
 from gradient_descent.interfaces import ParameterHandler
@@ -96,7 +96,7 @@ def method_hopa(system):
 
 def method_gdpa(system):
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    param_handler = PriorityExtractor()
+    param_handler = FPHandler()
     cost_function = InvslackCost(parameter_handler=param_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
     gradient_function = VectorFPGradientFunction(PrioritiesMatrix())
@@ -178,7 +178,7 @@ def method_v1_implicit(system):
 def method_v1_fd(system):
     """V1 finite-difference gradient (discrete priorities, fast surrogate)."""
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    param_handler = PriorityExtractor()
+    param_handler = FPHandler()
     cost_function = InvslackCost(parameter_handler=param_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=40)
     gradient_function = V1FiniteDifferenceGradient(eps=0.05)

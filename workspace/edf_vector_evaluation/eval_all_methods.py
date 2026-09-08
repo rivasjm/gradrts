@@ -21,7 +21,7 @@ from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import DeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem, SchedulerType
@@ -49,7 +49,7 @@ def edf_hopa(system: LinearSystem) -> bool:
 
 def edf_gdpa_surr(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     stop_fn = ThresholdStopFunction(limit=200, patience=50)
     grad_fn = SurrogateEDFGradient(
@@ -70,7 +70,7 @@ def edf_gdpa_surr(system: LinearSystem) -> bool:
 
 def edf_gdpa_vec(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     stop_fn = ThresholdStopFunction(limit=50, patience=15)
     grad_fn = VectorEDFGradientFunctionV2(sigma=1.5, cost_limit_factor=10)

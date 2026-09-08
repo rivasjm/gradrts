@@ -19,7 +19,7 @@ from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import SequentialGradientFunction
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import DeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem, SchedulerType
@@ -38,7 +38,7 @@ def optimise(
     Returns (final_cost, trajectory, elapsed_seconds).
     """
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     stop_fn = ThresholdStopFunction(limit=max_iters, patience=patience)
     update_fn = NoisyAdam()
@@ -91,7 +91,7 @@ def compare_on_systems(systems, max_iters=50, patience=15):
         sys_seq = copy.deepcopy(sys_template)
         grad_seq = SequentialGradientFunction(
             cost_function=InvslackCost(
-                parameter_handler=DeadlineExtractor(),
+                parameter_handler=DeadlineHandler(),
                 analysis=HolisticLocalEDFAnalysis(limit_factor=10, reset=False),
             ),
             sigma=1.5,

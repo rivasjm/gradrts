@@ -12,7 +12,7 @@ from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
 from examples.generator import unbalance_contended
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import MappingOnlyExtractor
+from gradient_descent.parameter_handlers import MappingHandler
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
@@ -22,7 +22,7 @@ from vector.vector_fp import VectorFPGradientFunction, MappingOnlyMatrix
 
 def gdpa_pd_fp_mapping_only_vector(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    parameter_handler = MappingOnlyExtractor()
+    parameter_handler = MappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100, patience=None)
     gradient_function = VectorFPGradientFunction(scenarios_builder=MappingOnlyMatrix(), sigma=3.0, cost_limit_factor=1)

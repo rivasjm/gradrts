@@ -15,7 +15,7 @@ from examples.evaluation import SchedRatioEval
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import SequentialGradientFunction
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import DeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem, SchedulerType
@@ -36,7 +36,7 @@ def edf_pd(system: LinearSystem) -> bool:
 def edf_gdpa_sequential(system: LinearSystem) -> bool:
     """GDPA with finite-difference gradient (gold-standard, slow)."""
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    parameter_handler = DeadlineExtractor()
+    parameter_handler = DeadlineHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
     gradient_function = SequentialGradientFunction(cost_function=cost_function, sigma=1.5)
@@ -60,7 +60,7 @@ def edf_gdpa_sequential(system: LinearSystem) -> bool:
 def edf_gdpa_surrogate(system: LinearSystem, tau=0.5, N_w=10) -> bool:
     """GDPA with differentiable EDF surrogate gradient."""
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    parameter_handler = DeadlineExtractor()
+    parameter_handler = DeadlineHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
     gradient_function = SurrogateEDFGradient(
@@ -138,7 +138,7 @@ if __name__ == "__main__":
 
     # Time sequential gradient
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     seq_grad = SequentialGradientFunction(cost_function=cost_fn, sigma=1.5)
     x = ph.extract(test_sys)

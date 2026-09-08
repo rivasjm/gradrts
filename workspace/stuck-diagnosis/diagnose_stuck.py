@@ -17,7 +17,7 @@ from examples.example_models import get_system
 from examples.generator import set_utilization, unbalance
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import MappingOnlyExtractor
+from gradient_descent.parameter_handlers import MappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
@@ -68,7 +68,7 @@ def run_single_system(seed=42, utilization=0.5, verbose=True):
 
     # --- build solver (exactly matches evaluation) ---
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    parameter_handler = MappingOnlyExtractor()
+    parameter_handler = MappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100, patience=20)
     gradient_function = VectorFPGradientFunction(
@@ -128,7 +128,7 @@ def profile_first_iteration(seed=42, utilization=0.5):
     set_utilization(system, utilization)
     PDAssignment(normalize=True).apply(system)
 
-    parameter_handler = MappingOnlyExtractor()
+    parameter_handler = MappingHandler()
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     gradient_function = VectorFPGradientFunction(

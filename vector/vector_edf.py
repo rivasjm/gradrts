@@ -400,7 +400,7 @@ class DeadlineScenarios:
         ----------
         system : LinearSystem
         inputs : list of list[float]
-            Each inner list is a DeadlineExtractor-compatible parameter vector.
+            Each inner list is a DeadlineHandler-compatible parameter vector.
 
         Returns
         -------

@@ -11,7 +11,7 @@ from examples.generator import unbalance
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import AvgSeparationDelta, SequentialGradientFunction
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import DeadlineExtractor, MappingDeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler, DeadlineMappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem, SchedulerType
@@ -30,7 +30,7 @@ def edf_local_hopa(system: LinearSystem) -> bool:
 
 def edf_local_gdpa(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    parameter_handler = DeadlineExtractor()
+    parameter_handler = DeadlineHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
     gradient_function = SequentialGradientFunction(cost_function=cost_function, sigma=1.5)
@@ -48,7 +48,7 @@ def edf_local_gdpa(system: LinearSystem) -> bool:
 
 def edf_local_mapping_gdpa(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    parameter_handler = MappingDeadlineExtractor()
+    parameter_handler = DeadlineMappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
     gradient_function = SequentialGradientFunction(cost_function=cost_function, sigma=1.5)

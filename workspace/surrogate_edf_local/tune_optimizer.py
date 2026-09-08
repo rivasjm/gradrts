@@ -11,7 +11,7 @@ from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import SequentialGradientFunction
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import DeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem, SchedulerType
@@ -20,7 +20,7 @@ from surrogate.surrogate_edf import SurrogateEDFGradient
 
 def optimise_and_check(system, grad_fn, max_iters, patience):
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
     stop_fn = ThresholdStopFunction(limit=max_iters, patience=patience)
     update_fn = NoisyAdam()
@@ -88,7 +88,7 @@ def main():
     for sys_template in systems[:5]:  # only 5 for time
         s = copy.deepcopy(sys_template)
         analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-        ph = DeadlineExtractor()
+        ph = DeadlineHandler()
         cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
         grad_fn = SequentialGradientFunction(cost_function=cost_fn, sigma=1.5)
         ok, cost, elapsed = optimise_and_check(s, grad_fn, 50, 15)

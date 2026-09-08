@@ -11,7 +11,7 @@ from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import MappingPriorityExtractor
+from gradient_descent.parameter_handlers import FPMappingHandler
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
@@ -35,7 +35,7 @@ def pd_fp(system: LinearSystem) -> bool:
 
 def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    parameter_handler = MappingPriorityExtractor()
+    parameter_handler = FPMappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=limit)
     gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix())

@@ -9,7 +9,7 @@ from assignment.assignments import PDAssignment
 from examples.example_models import get_system
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import SequentialGradientFunction
-from gradient_descent.parameter_handlers import DeadlineExtractor
+from gradient_descent.parameter_handlers import DeadlineHandler
 from model.linear_system import SchedulerType
 from surrogate.surrogate_edf import SurrogateEDFGradient
 from workspace.surrogate_edf_local.edf_gradient_v2 import SurrogateEDFGradientV2
@@ -32,7 +32,7 @@ def main():
         for i in range(n_sys)
     ]
 
-    ph = DeadlineExtractor()
+    ph = DeadlineHandler()
     cost_fn = InvslackCost(parameter_handler=ph,
                            analysis=HolisticLocalEDFAnalysis(limit_factor=10, reset=False))
 

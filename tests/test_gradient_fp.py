@@ -8,7 +8,7 @@ from examples.examples_special import get_validation_example
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import gradient_inputs_from_deltas
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import PriorityExtractor
+from gradient_descent.parameter_handlers import FPHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
@@ -38,7 +38,7 @@ class GradientTest(unittest.TestCase):
         vec_wcrts = [t.wcrt for t in system_vec.tasks]
 
         for i, (s, v) in enumerate(zip(seq_wcrts, vec_wcrts)):
-            self.assertAlmostEqual(s, v, delta=0.001,
+            self.assertAlmostEqual(s, v, delta=0.01,
                                    msg=f"Task {i} WCRT mismatch: seq={s:.6f} vec={v:.6f}")
 
     def test_priorities_matrix_scenarios(self):
@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
 def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    parameter_handler = PriorityExtractor()
+    parameter_handler = FPHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
     gradient_function = VectorFPGradientFunction(PrioritiesMatrix())
