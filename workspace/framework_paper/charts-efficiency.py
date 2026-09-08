@@ -14,37 +14,35 @@ HERE = Path(__file__).resolve().parent
 OUTPUT_DIR = HERE
 
 METHOD_COLORS = {
-    "gdpa-vec": "#1f77b4",
-    "gdpa-seq": "#9467bd",
-    "gdpa+map-vec": "#ff7f0e",
-    "gdpa+map-seq": "#2ca02c",
-    "gdpa": "#1f77b4",
-    "hopa": "#8c564b",
-    "pd": "#17becf",
-    "bf": "#d62728",
+    "gdpa": "#0000FF",
+    "gdpa-100": "#0000FF",
+    "gdpa-200": "#FF8C00",
+    "hopa": "#008000",
+    "pd": "#8B4513",
+    "bf": "#FF0000",
 }
 
 SCENARIOS = (
     {
         "name": "FP",
-        "directory": "fp",
+        "directory": "fp/gradient_fp_eval",
         "prefix": "gradient_fp_eval",
-        "methods": ("gdpa-vec", "gdpa-seq", "hopa", "pd", "bf"),
-        "labels": ("gdpa-vec", "gdpa-seq", "hopa", "pd", "bf"),
+        "methods": ("gdpa-vec", "hopa", "pd", "bf"),
+        "labels": ("gdpa", "hopa", "pd", "bf"),
     },
     {
         "name": "MAP",
-        "directory": "fp-mapping",
+        "directory": "fp-mapping/gradient_fp_mapping_eval",
         "prefix": "gradient_fp_mapping_eval",
-        "methods": ("gdpa-mapping-vec", "gdpa-mapping-seq", "gdpa", "pd"),
-        "labels": ("gdpa+map-vec", "gdpa+map-seq", "gdpa", "pd"),
+        "methods": ("pd", "hopa", "gdpa-100", "gdpa-200"),
+        "labels": ("pd", "hopa", "gdpa-100", "gdpa-200"),
     },
     {
         "name": "EDF",
-        "directory": "edf-local",
+        "directory": "edf-local/gradient_edf_local_eval",
         "prefix": "gradient_edf_local_eval",
-        "methods": ("EDF-L GDPA", "EDF-L HOPA", "EDF-L PD"),
-        "labels": ("gdpa", "hopa", "pd"),
+        "methods": ("pd", "hopa", "gdpa"),
+        "labels": ("pd", "hopa", "gdpa"),
     },
 )
 
@@ -55,7 +53,7 @@ def load_totals(scenario):
         data_dir / f'{scenario["prefix"]}_schedulables.xlsx', index_col=0
     )
     times = pd.read_excel(
-        data_dir / f'{scenario["prefix"]}_times.xlsx', index_col=0
+        data_dir / f'{scenario["prefix"]}_times_success.xlsx', index_col=0
     )
 
     methods = list(scenario["methods"])
