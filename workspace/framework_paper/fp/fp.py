@@ -104,7 +104,7 @@ def bf_fp(system: LinearSystem) -> bool:
 
 
 if __name__ == '__main__':
-    eval_name = "gradient_fp_eval"
+    eval_name = "fp"
     parser = argparse.ArgumentParser(description="Gradient FP validation")
     parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
                         help="Output directory for generated files (default: script directory)")

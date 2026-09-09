@@ -56,7 +56,7 @@ def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
 
 
 if __name__ == '__main__':
-    eval_name = "gradient_fp_mapping_eval"
+    eval_name = "map"
     parser = argparse.ArgumentParser(description="Gradient FP+mapping validation")
     parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
                         help="Output directory for generated files (default: script directory)")

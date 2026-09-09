@@ -1,9 +1,9 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-FP_EXCEL = "./fp/gradient_fp_eval/gradient_fp_eval_times_success.xlsx"
-EDF_LOCAL_EXCEL = "./edf-local/gradient_edf_local_eval/gradient_edf_local_eval_times_success.xlsx"
-FP_MAPPING_EXCEL = "./fp-mapping/gradient_fp_mapping_eval/gradient_fp_mapping_eval_times_success.xlsx"
+FP_EXCEL = "./fp/fp/fp_times_success.xlsx"
+EDF_LOCAL_EXCEL = "./edf/edf/edf_times_success.xlsx"
+FP_MAPPING_EXCEL = "./map/map/map_times_success.xlsx"
 
 METHOD_STYLES = {
     'gdpa':     {'color': '#0000FF', 'marker': 'o', 'ls': '-'},

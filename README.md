@@ -14,11 +14,13 @@ pip install -e .
 
 ## Running experiments
 
+The paper evaluation lives in `workspace/framework_paper/`. See its
+[README](workspace/framework_paper/README.md) for details. To run a scenario:
+
 ```bash
-python workspace/gradient_fp_validation/gradient_fp_val.py
-python workspace/gradient_fp_mapping_validation/gradient_fp_mapping_val.py
-python workspace/gradient_edf_local_validation/gradient_edf_local_val.py
-python workspace/gradient_edf_local_mapping_validation/gradient_edf_local_mapping_val.py
+python workspace/framework_paper/fp/fp.py
+python workspace/framework_paper/map/map.py
+python workspace/framework_paper/edf/edf.py
 ```
 
 ## Running tests

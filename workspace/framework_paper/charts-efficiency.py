@@ -25,22 +25,22 @@ METHOD_COLORS = {
 SCENARIOS = (
     {
         "name": "FP",
-        "directory": "fp/gradient_fp_eval",
-        "prefix": "gradient_fp_eval",
+        "directory": "fp/fp",
+        "prefix": "fp",
         "methods": ("gdpa-vec", "hopa", "pd", "bf"),
         "labels": ("gdpa", "hopa", "pd", "bf"),
     },
     {
         "name": "MAP",
-        "directory": "fp-mapping/gradient_fp_mapping_eval",
-        "prefix": "gradient_fp_mapping_eval",
+        "directory": "map/map",
+        "prefix": "map",
         "methods": ("pd", "hopa", "gdpa-100", "gdpa-200"),
         "labels": ("pd", "hopa", "gdpa-100", "gdpa-200"),
     },
     {
         "name": "EDF",
-        "directory": "edf-local/gradient_edf_local_eval",
-        "prefix": "gradient_edf_local_eval",
+        "directory": "edf/edf",
+        "prefix": "edf",
         "methods": ("pd", "hopa", "gdpa"),
         "labels": ("pd", "hopa", "gdpa"),
     },

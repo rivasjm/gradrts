@@ -11,9 +11,9 @@ the GDPA (Gradient Descent Parameter Assignment) framework:
 
 | Scenario | Directory | Optimized parameters | Analysis |
 |----------|-----------|----------------------|----------|
-| **FP**   | `fp/`         | Fixed priorities     | Holistic FP |
-| **MAP**  | `fp-mapping/` | Fixed priorities + step-to-processor mapping | Holistic FP |
-| **EDF**  | `edf-local/`  | Local deadlines      | Holistic Local EDF |
+| **FP**   | `fp/`  | Fixed priorities     | Holistic FP |
+| **MAP**  | `map/` | Fixed priorities + step-to-processor mapping | Holistic FP |
+| **EDF**  | `edf/` | Local deadlines      | Holistic Local EDF |
 
 All scenarios share the same pool of synthetic systems: 5 flows x 3 tasks = 15 tasks,
 3 processors, 20 utilization levels between 50% and 90%, 50 systems per level. The FP and
@@ -24,9 +24,9 @@ uses an arbitrary, unbalanced initial mapping.
 
 Each scenario has a script that generates the data:
 
-- `fp/gradient_fp_val.py` -> generates `fp/gradient_fp_eval/`
-- `fp-mapping/gradient_fp_mapping_val.py` -> generates `fp-mapping/gradient_fp_mapping_eval/`
-- `edf-local/gradient_edf_local_val.py` -> generates `edf-local/gradient_edf_local_eval/`
+- `fp/fp.py` -> generates `fp/fp/`
+- `map/map.py` -> generates `map/map/`
+- `edf/edf.py` -> generates `edf/edf/`
 
 Methods compared per scenario (column names in the `.xlsx` files):
 
@@ -94,9 +94,9 @@ Use the repository venv:
 
 ```bash
 # 1. (re)generate the data of a scenario
-python fp/gradient_fp_val.py
-python fp-mapping/gradient_fp_mapping_val.py
-python edf-local/gradient_edf_local_val.py
+python fp/fp.py
+python map/map.py
+python edf/edf.py
 
 # 2. regenerate the figures
 python charts.py

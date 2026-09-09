@@ -5,9 +5,9 @@ import matplotlib.ticker as ticker
 import openpyxl
 from collections import defaultdict
 
-FP_EXCEL = "./fp/gradient_fp_eval/gradient_fp_eval_schedulables.xlsx"
-EDF_LOCAL_EXCEL = "./edf-local/gradient_edf_local_eval/gradient_edf_local_eval_schedulables.xlsx"
-FP_MAPPING_EXCEL = "./fp-mapping/gradient_fp_mapping_eval/gradient_fp_mapping_eval_schedulables.xlsx"
+FP_EXCEL = "./fp/fp/fp_schedulables.xlsx"
+EDF_LOCAL_EXCEL = "./edf/edf/edf_schedulables.xlsx"
+FP_MAPPING_EXCEL = "./map/map/map_schedulables.xlsx"
 
 METHOD_STYLES = {
     'gdpa':     {'color': '#0000FF', 'marker': 'o', 'ls': '-'},

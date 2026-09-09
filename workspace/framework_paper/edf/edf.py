@@ -52,7 +52,7 @@ def edf_local_gdpa(system: LinearSystem) -> bool:
 
 
 if __name__ == '__main__':
-    eval_name = "gradient_edf_local_eval"
+    eval_name = "edf"
     parser = argparse.ArgumentParser(description="Gradient EDF local validation")
     parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
                         help="Output directory for generated files (default: script directory)")
