@@ -26,7 +26,7 @@ METHOD_STYLES = {
 # its output, ``key`` is the evaluation name prefix (also the output subdir name).
 SCENARIOS = (
     {'key': 'fp', 'title': 'FP', 'directory': 'fp',
-     'columns': ('gdpa-vec', 'hopa', 'pd', 'bf')},
+     'columns': ('gdpa', 'hopa', 'pd', 'bf')},
     {'key': 'map', 'title': 'MAP', 'directory': 'map',
      'columns': ('pd', 'hopa', 'gdpa-100', 'gdpa-200')},
     {'key': 'map-unbalanced', 'title': 'MAP unbal.', 'directory': 'map',
@@ -42,14 +42,11 @@ def data_file(scenario, size, suffix):
 
 
 def load(scenario, size, suffix):
-    """Load a scenario's data, keeping only the columns shown and renaming
-    ``gdpa-vec`` to ``gdpa``. Missing optional columns (e.g. ``bf`` for sizes
-    where brute force is not run) are dropped."""
+    """Load a scenario's data, keeping only the columns shown. Missing optional
+    columns (e.g. ``bf`` for sizes where brute force is not run) are dropped."""
     df = pd.read_excel(data_file(scenario, size, suffix), index_col=0)
     columns = [c for c in scenario['columns'] if c in df.columns]
-    df = df[columns].copy()
-    df.rename(columns={'gdpa-vec': 'gdpa'}, inplace=True)
-    return df
+    return df[columns].copy()
 
 
 def subfigure_labels(axs):

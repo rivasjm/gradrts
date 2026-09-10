@@ -77,7 +77,6 @@ if __name__ == '__main__':
     tools = [
         ("pd", pd_fp),
         ("hopa", hopa_fp),
-        ("gdpa-50", partial(gdpa_mapping_fp, limit=50)),
         ("gdpa-100", partial(gdpa_mapping_fp, limit=100)),
         ("gdpa-200", partial(gdpa_mapping_fp, limit=200)),
     ]

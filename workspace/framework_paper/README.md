@@ -56,12 +56,12 @@ Methods compared per scenario (column names in the `.xlsx` files):
 
 | Scenario | Methods |
 |----------|---------|
-| FP (`fp-15`)    | `gdpa-vec`, `gdpa-seq`, `hopa`, `pd`, `bf` |
-| FP (`fp-25`)    | `gdpa-vec`, `gdpa-seq`, `hopa`, `pd` |
-| MAP   | `pd`, `hopa`, `gdpa-50`, `gdpa-100`, `gdpa-200` |
+| FP (`fp-15`)    | `gdpa`, `hopa`, `pd`, `bf` |
+| FP (`fp-25`)    | `gdpa`, `hopa`, `pd` |
+| MAP   | `pd`, `hopa`, `gdpa-100`, `gdpa-200` |
 | EDF   | `pd`, `hopa`, `gdpa` |
 
-- `gdpa`: GDPA framework (in MAP it is evaluated with 50, 100 and 200 maximum iterations).
+- `gdpa`: GDPA framework (in MAP it is evaluated with 100 and 200 maximum iterations).
 - `hopa`: the iterative HOPA algorithm.
 - `pd`: proportional deadlines assignment (non-iterative).
 - `bf`: exhaustive priority search (FP only, size 15 only). It evaluates all
@@ -101,7 +101,7 @@ not included.
 
 The figures show a subset of the methods and rename columns:
 
-- **FP**: `gdpa` (column `gdpa-vec`), `hopa`, `pd`, and `bf` when present.
+- **FP**: `gdpa`, `hopa`, `pd`, and `bf` when present.
 - **MAP** (both variants): `pd`, `hopa`, `gdpa-100`, `gdpa-200`.
 - **EDF**: `pd`, `hopa`, `gdpa`.
 

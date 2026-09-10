@@ -14,7 +14,6 @@ from gradient_descent.parameter_handlers import FPHandler
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
-from gradient_descent.gradient_function import SequentialGradientFunction
 from model.linear_system import LinearSystem
 from vector.vector_fp import VectorFPGradientFunction, PrioritiesMatrix
 from workspace.framework_paper.systems import SIZES, get_systems
@@ -26,28 +25,6 @@ def gdpa_pd_fp_vector(system: LinearSystem) -> bool:
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
     gradient_function = VectorFPGradientFunction(PrioritiesMatrix())
-
-    update_function = NoisyAdam()
-    optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
-                                        cost_function=cost_function,
-                                        stop_function=stop_function,
-                                        gradient_function=gradient_function,
-                                        update_function=update_function,
-                                        verbose=False)
-
-    pd = PDAssignment(normalize=True)
-    pd.apply(system)
-    optimizer.apply(system)
-    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
-    return system.is_schedulable()
-
-
-def gdpa_pd_fp_seq(system: LinearSystem) -> bool:
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    parameter_handler = FPHandler()
-    cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
-    stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = SequentialGradientFunction(cost_function=cost_function)
 
     update_function = NoisyAdam()
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
@@ -91,8 +68,7 @@ def build_tools(size):
     """Methods compared in the FP scenario. Brute force is only feasible for the
     smallest size, so it is included only there."""
     tools = [
-        ("gdpa-vec", gdpa_pd_fp_vector),
-        ("gdpa-seq", gdpa_pd_fp_seq),
+        ("gdpa", gdpa_pd_fp_vector),
         ("hopa", hopa_fp),
         ("pd", pd_fp),
     ]
