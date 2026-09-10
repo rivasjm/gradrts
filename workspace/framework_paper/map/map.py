@@ -1,15 +1,15 @@
 import argparse
-import numpy as np
 import os
 from functools import partial
 
+import numpy as np
+
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
-from random import Random
 
 from assignment.assignments import PDAssignment
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
-from examples.example_models import get_system
+from examples.generator import set_system_utilization, set_utilization
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import FPMappingHandler
 from gradient_descent.cost_functions import InvslackCost
@@ -17,6 +17,7 @@ from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
 from vector.vector_fp import VectorFPGradientFunction, MappingPrioritiesMatrix
+from workspace.framework_paper.systems import SIZES, get_systems
 
 
 def hopa_fp(system: LinearSystem) -> bool:
@@ -56,20 +57,19 @@ def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
 
 
 if __name__ == '__main__':
-    eval_name = "map"
     parser = argparse.ArgumentParser(description="Gradient FP+mapping validation")
+    parser.add_argument("size", type=int, choices=sorted(SIZES), nargs="?", default=15,
+                        help="System size (total number of tasks)")
+    parser.add_argument("--unbalanced", action="store_true",
+                        help="Start from an unbalanced initial mapping with uneven per-processor "
+                             "load, and sweep utilization while keeping that mapping")
     parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
                         help="Output directory for generated files (default: script directory)")
     args = parser.parse_args()
 
-    # create population of examples
-    rnd = Random(42)
-    size = (5, 3, 3)  # flows, tasks, procs
-    n = 50
-    systems = [get_system(size, rnd, balanced=False, name=str(i),
-                          deadline_factor_min=0.5,
-                          deadline_factor_max=1,
-                          period_min=100, period_max=1000) for i in range(n)]
+    eval_name = f"map-{args.size}" if not args.unbalanced else f"map-unbalanced-{args.size}"
+    systems = get_systems(args.size, balanced=not args.unbalanced)
+    utilization_func = set_system_utilization if args.unbalanced else set_utilization
 
     # utilizations between 50 % and 90 %
     utilizations = np.linspace(0.5, 0.9, 20)
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     output_dir = os.path.join(args.output_dir, eval_name)
     os.makedirs(output_dir, exist_ok=True)
     runner = SchedRatioEval(eval_name, labels=labels, funcs=funcs,
-                            # preprocessor=unbalance_contended,
                             systems=systems, utilizations=utilizations, threads=6,
+                            utilization_func=utilization_func,
                             output_dir=output_dir)
     runner.run()

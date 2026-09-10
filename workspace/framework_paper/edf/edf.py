@@ -1,6 +1,5 @@
 import argparse
 import os
-from random import Random
 
 import numpy as np
 
@@ -8,14 +7,15 @@ from analysis.holistic_local_edf_analysis import HolisticLocalEDFAnalysis
 from assignment.assignments import PDAssignment
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
-from examples.example_models import get_system
+from examples.generator import to_edf
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import SequentialGradientFunction
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import DeadlineHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
-from model.linear_system import LinearSystem, SchedulerType
+from model.linear_system import LinearSystem
+from workspace.framework_paper.systems import SIZES, get_systems
 
 
 def item(system, assignment, test):
@@ -52,20 +52,17 @@ def edf_local_gdpa(system: LinearSystem) -> bool:
 
 
 if __name__ == '__main__':
-    eval_name = "edf"
     parser = argparse.ArgumentParser(description="Gradient EDF local validation")
+    parser.add_argument("size", type=int, choices=sorted(SIZES), nargs="?", default=15,
+                        help="System size (total number of tasks)")
     parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
                         help="Output directory for generated files (default: script directory)")
     args = parser.parse_args()
 
-    # create population of examples
-    rnd = Random(42)
-    size = (5, 3, 3)  # flows, tasks, procs
-    n = 50
-    systems = [get_system(size, rnd, balanced=True, name=str(i),
-                          deadline_factor_min=0.5, sched=SchedulerType.EDF,
-                          deadline_factor_max=1,
-                          period_min=100, period_max=1000) for i in range(n)]
+    eval_name = f"edf-{args.size}"
+    systems = get_systems(args.size)
+    for system in systems:
+        to_edf(system)
 
     # utilizations between 50 % and 90 %
     utilizations = np.linspace(0.5, 0.9, 20)

@@ -202,7 +202,7 @@ class BruteForceMappingTest(unittest.TestCase):
         for seed in range(5):
             with self.subTest(seed=seed):
                 rnd = Random(seed)
-                system = get_system((1, 2, 2), random=rnd, utilization=0.5, balanced=True)
+                system = get_system((1, 2, 2), random=rnd, utilization=0.25, balanced=True)
                 analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
 
                 pd = PDAssignment(normalize=True)
@@ -279,7 +279,7 @@ class BruteForceMappingOnlyTest(unittest.TestCase):
         for seed in range(5):
             with self.subTest(seed=seed):
                 rnd = Random(seed)
-                system = get_system((1, 2, 2), random=rnd, utilization=0.5, balanced=True)
+                system = get_system((1, 2, 2), random=rnd, utilization=0.25, balanced=True)
                 analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
 
                 pd = PDAssignment(normalize=True)

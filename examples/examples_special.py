@@ -12,7 +12,7 @@ def get_validation_example():
     n = 50
     system = [get_system(size, rnd, balanced=True, name=str(i),
                           deadline_factor_min=0.5,
-                          deadline_factor_max=1) for i in range(n)][38]
+                          deadline_factor_max=1) for i in range(n)][36]
 
     utilization = np.linspace(0.5, 0.9, 20)[13]
     set_utilization(system, utilization)

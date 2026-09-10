@@ -48,6 +48,18 @@ def set_system_utilization(system: LinearSystem, utilization: float):
         task.wcet *= factor
 
 
+def assign_balanced(tasks, procs):
+    """Assign tasks round-robin (highest utilization first) so that every
+    processor gets the same number of tasks and the load is spread out.
+
+    Uses no randomness, so the task set is identical to the unbalanced mapping
+    for the same random stream.
+    """
+    order = sorted(tasks, key=lambda task: task.utilization, reverse=True)
+    for i, task in enumerate(order):
+        task.processor = procs[i % len(procs)]
+
+
 def generate_system(random: Random, n_flows, n_tasks, n_procs, utilization, sched: SchedulerType,
                     period_min=100, period_max=100000, deadline_factor_min=0.5, deadline_factor_max=1,
                     balanced=False) -> LinearSystem:
@@ -55,7 +67,7 @@ def generate_system(random: Random, n_flows, n_tasks, n_procs, utilization, sche
     procs = [Processor(name=f"proc{i}", sched=sched) for i in range(n_procs)]
     system.add_procs(*procs)
 
-    # set the general structure
+    # set the general structure (mapping is decided later)
     for f in range(n_flows):
         period = log_uniform(random, period_min, period_max)
         deadline = random.uniform(
@@ -63,26 +75,24 @@ def generate_system(random: Random, n_flows, n_tasks, n_procs, utilization, sche
             period * n_tasks * deadline_factor_max)
         flow = Flow(name=f"flow{f}", period=period, deadline=deadline)
 
-        # for now leave the WCET empty
-        tasks = [Task(name=f"task{f}_{t}", wcet=0, processor=random.choice(procs)) for t in range(n_tasks)]
+        # for now leave the WCET and the processor empty
+        tasks = [Task(name=f"task{f}_{t}", wcet=0) for t in range(n_tasks)]
         flow.add_tasks(*tasks)
         system.add_flows(flow)
 
-    # if balanced=True, balance the number of tasks per processor (ignore current mapping)
-    if balanced:
-        # r = Random(len(system.tasks))
-        tasks = system.tasks
-        random.shuffle(tasks)
-        for i, task in enumerate(tasks):
-            task.processor = procs[i % len(procs)]
+    # draw the task utilizations globally (average per processor = utilization),
+    # so that every mapping strategy starts from exactly the same task set
+    tasks = system.tasks
+    us = uunifast(random, len(tasks), utilization * n_procs)
+    for task, u in zip(tasks, us):
+        task.wcet = u * task.period
 
-    # set the WCET's
-    for proc in procs:
-        tasks = proc.tasks
-        if tasks:
-            us = uunifast(random, len(tasks), utilization)
-            for task, u in zip(tasks, us):
-                task.wcet = u * task.period
+    # mapping: balanced gets the same number of tasks per processor, unbalanced
+    # gets a contended mapping with uneven load
+    if balanced:
+        assign_balanced(tasks, procs)
+    else:
+        unbalance_contended(system)
 
     return system
 

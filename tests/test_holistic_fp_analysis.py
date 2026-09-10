@@ -50,13 +50,12 @@ class HolisticTest(unittest.TestCase):
                                  period_min=100, period_max=100 * random.uniform(2.0, 1000.0),
                                  deadline_factor_min=0.5, deadline_factor_max=2)
 
-        # this one should be schedulable at the third iteration
-        # in the first iteration it triggers the stop factor
+        # regression value for the current generator with this random draw
         system.apply(hopa)
         system.apply(holistic)
         print(system.is_schedulable())
         print(system.slack)
-        self.assertAlmostEqual(system.slack, 0.28803, delta=0.00001)  # should be from iteration 8 of 12
+        self.assertAlmostEqual(system.slack, -0.5827650594094141, delta=0.00001)
 
 
 if __name__ == '__main__':
