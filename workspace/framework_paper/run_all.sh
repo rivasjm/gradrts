@@ -24,6 +24,7 @@ else
 fi
 
 echo "Interpreter: $PY"
+export PYTHONUNBUFFERED=1
 cd "$CODE"
 
 for size in 15 25; do
