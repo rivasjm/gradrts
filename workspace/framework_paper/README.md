@@ -1,5 +1,32 @@
 # Gradient Descent framework evaluations (paper)
 
+## Run all evaluations
+
+From the `code/` directory, with the virtualenv active (`source .venv/bin/activate`):
+
+```bash
+# FP
+python workspace/framework_paper/fp/fp.py 15
+python workspace/framework_paper/fp/fp.py 25
+
+# MAP (balanced and unbalanced)
+python workspace/framework_paper/map/map.py 15
+python workspace/framework_paper/map/map.py 25
+python workspace/framework_paper/map/map.py 15 --unbalanced
+python workspace/framework_paper/map/map.py 25 --unbalanced
+
+# EDF
+python workspace/framework_paper/edf/edf.py 15
+python workspace/framework_paper/edf/edf.py 25
+
+# Figures (one per size)
+python workspace/framework_paper/charts.py
+python workspace/framework_paper/times.py
+python workspace/framework_paper/charts-efficiency.py
+```
+
+Each scenario writes into `<scenario>/<scenario>-<size>/`. EDF is the slowest scenario.
+
 This directory contains the evaluations used in the evaluation section of the paper
 (`src/06_evaluation.tex`), the scripts that run them, the generated data, and the scripts
 that produce the figures.
