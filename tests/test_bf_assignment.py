@@ -202,7 +202,7 @@ class BruteForceMappingTest(unittest.TestCase):
         for seed in range(5):
             with self.subTest(seed=seed):
                 rnd = Random(seed)
-                system = get_system((1, 2, 2), random=rnd, utilization=0.25, balanced=True)
+                system = get_system((1, 2, 2), random=rnd, utilization=0.5, balanced=True)
                 analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
 
                 pd = PDAssignment(normalize=True)
@@ -233,6 +233,15 @@ class BruteForceMappingTest(unittest.TestCase):
         self.assertGreater(bf.space_size, 0)
         self.assertTrue(bf.schedulable)
         self.assertGreater(bf.iterations_to_sched, 0)
+
+    def test_contended_mapping_terminates(self):
+        """Regression: a mapping scenario that puts every task on one processor
+        (utilisation 1.0) used to make the vectorized analysis loop forever."""
+        system = get_system((1, 2, 2), random=Random(2), utilization=0.5, balanced=True)
+        PDAssignment(normalize=True).apply(system)
+        bf = BruteForceFPMappingAssignment(batch_size=100)
+        bf.apply(system)
+        self.assertIsInstance(bf.schedulable, bool)
 
 
 class BruteForceMappingOnlyTest(unittest.TestCase):
@@ -279,7 +288,7 @@ class BruteForceMappingOnlyTest(unittest.TestCase):
         for seed in range(5):
             with self.subTest(seed=seed):
                 rnd = Random(seed)
-                system = get_system((1, 2, 2), random=rnd, utilization=0.25, balanced=True)
+                system = get_system((1, 2, 2), random=rnd, utilization=0.5, balanced=True)
                 analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
 
                 pd = PDAssignment(normalize=True)

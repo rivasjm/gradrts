@@ -201,6 +201,27 @@ class VectorHolisticFPAnalysis:
         # there are t tasks, and s scenarios
         s, t, _ = pm.shape
 
+        # wcrt limit for each task. if the provisional wcrt of any task reaches this, that scenario should stop
+        r_limit = limit * deadlines  # 2D matrix (t, 1)
+
+        # response cached for infeasible scenarios: strictly above r_limit so that
+        # the slack (deadline - response) is negative
+        over_limit_response = (limit + 1) * deadlines  # 2D matrix (t, 1)
+
+        # discard scenarios where a processor reaches full utilisation: the busy
+        # period does not close and the fixed-point loop below would not terminate
+        utilisation = wcets / periods  # (t, 1)
+        same_processor = (pm != 0) | (pm.transpose(0, 2, 1) != 0)  # (s, t, t)
+        same_processor |= np.eye(t, dtype=bool)
+        processor_utilization = (same_processor @ utilisation).max(axis=1).reshape(s)
+        over_utilization = processor_utilization >= 1.0
+        if np.any(over_utilization):
+            cache_over_limit(pm, over_limit_response, cache, over_utilization)
+            pm = remove_scenarios(over_utilization, pm)[0]
+            if pm.size == 0:
+                return build_results_from_cache(priority_matrix, cache)
+            s, t, _ = pm.shape
+
         # the successors' matrix maps, for each task (row), which task is its successor (column)
         # this is a 2D matrix (t, t) (all scenarios have the same successors mapping)
         sm = successor_matrix(successors)
@@ -214,9 +235,6 @@ class VectorHolisticFPAnalysis:
 
         # jitter matrix with current wcrt. 3D matrix (s, t, 1)
         j = jitter_matrix(sm, r_max)
-
-        # wcrt limit for each task. if the provisional wcrt of any task reaches this, that scenario should stop
-        r_limit = limit * deadlines  # 2D matrix (t, 1)
 
         if verbose:
             print("Starting Holistic FP analysis (vectorized, cached)")
@@ -416,6 +434,22 @@ def cache_scenario_results(r, pm, scenarios, cache: ResultsCache):
         key = extract_scenario_data(pm, s)
         value = extract_scenario_data(r, s)
         cache.insert(key, value)
+
+
+def cache_over_limit(pm, responses, cache: ResultsCache, scenarios=None):
+    """Cache scenarios as infeasible with the given response times.
+
+    ``responses`` is a (t, 1) matrix with a per-task response time that is
+    strictly above the analysis limit. ``scenarios`` is a boolean (s) vector;
+    when omitted, every scenario in ``pm`` is cached.
+    """
+    s, t, _ = pm.shape
+    if scenarios is None:
+        scenarios = np.ones(s, dtype=bool)
+    if not np.any(scenarios):
+        return
+    results = np.broadcast_to(responses.reshape(1, t, 1), (s, t, 1)).astype(np.float64).copy()
+    cache_scenario_results(results, pm, scenarios, cache)
 
 
 def remove_scenarios(scenarios, *matrices):
