@@ -27,6 +27,12 @@ python workspace/framework_paper/charts-efficiency.py
 
 Each scenario writes into `<scenario>/<scenario>-<size>/`. EDF is the slowest scenario.
 
+Alternatively, run all of the above sequentially with:
+
+```bash
+bash workspace/framework_paper/run_all.sh
+```
+
 This directory contains the evaluations used in the evaluation section of the paper
 (`src/06_evaluation.tex`), the scripts that run them, the generated data, and the scripts
 that produce the figures.
