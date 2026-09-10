@@ -122,7 +122,15 @@ class SchedRatioEval:
                     all_results[u_index, :] += scheds
                     all_times[u_index, :] += times
                     all_success_times[u_index, :] += success_times
-                    print(f"{datetime.now()} : u={u} job={job}")
+                    total = len(self.utilizations) * len(self.systems)
+                    elapsed = time.time() - self.start
+                    cumulative = all_results.sum(axis=0)
+                    methods = " ".join(
+                        f"{lbl}={int(c)}"
+                        for lbl, c in zip(self.labels, cumulative))
+                    print(f"{datetime.now():%H:%M:%S} {self.name} u={u:.3f} "
+                          f"({u_index + 1}/{len(self.utilizations)}) "
+                          f"job={job}/{total} | {methods} | elapsed={elapsed:.0f}s")
 
             self._save(all_results, "schedulables")
             self._save(all_times / len(self.systems), "times", formats=("xlsx",))
