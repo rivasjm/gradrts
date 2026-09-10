@@ -104,8 +104,6 @@ class HolisticLocalEDFAnalysis(AnalysisFunction):
         # compute once and reuse across the p-loop.
         psi_ij = self._build_set_psi_ij(task, length)
         for p in range(1, math.ceil(length / task.period) + 1):
-            if self._timeout():
-                raise LimitFactorReachedException(task, max_r or task.wcrt or 0, float("inf"))
             psi_ab = self._build_set_psi_ab(task, length, p)
             psi_set = {psi for psi in (psi_ij | psi_ab) if
                        (p - 1) * task.period + task.deadline <= psi < p * task.period + task.deadline}
@@ -114,8 +112,8 @@ class HolisticLocalEDFAnalysis(AnalysisFunction):
                 r = self._ra(task, psi, w)
                 if r > max_r:
                     max_r = r
-                if r > task.flow.deadline * self.limit_factor:
-                    raise LimitFactorReachedException(task, r, task.flow.deadline * self.limit_factor)
+                if self._timeout() or r > task.flow.deadline * self.limit_factor:
+                    raise LimitFactorReachedException(task, max_r, task.flow.deadline * self.limit_factor)
 
         if max_r > task.wcrt:
             task.wcrt = max_r

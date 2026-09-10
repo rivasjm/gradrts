@@ -37,7 +37,7 @@ def edf_local_gdpa(system: LinearSystem) -> bool:
     analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False, max_time=None)
     parameter_handler = DeadlineHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
-    stop_function = ThresholdStopFunction(limit=100, max_time=None)
+    stop_function = ThresholdStopFunction(limit=100, max_time=120)
     gradient_function = SequentialGradientFunction(cost_function=cost_function)
     update_function = NoisyAdam()
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
