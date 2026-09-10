@@ -4,6 +4,12 @@
 #
 # Usage (from anywhere):
 #   bash workspace/framework_paper/run_all.sh
+#
+# To see the output live and also save it to a log (recommended for long runs):
+#   bash workspace/framework_paper/run_all.sh 2>&1 | tee run_all.log
+# Inside tmux: start a session, run the above, detach with Ctrl-b d and
+# reattach with `tmux attach -t <session>`. Use `tee -a run_all.log` to append
+# instead of overwriting.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
