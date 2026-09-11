@@ -33,6 +33,15 @@ Alternatively, run all of the above sequentially with:
 bash workspace/framework_paper/run_all.sh
 ```
 
+`run_all.sh` also accepts an optional subset of scenarios (`fp`, `map`, `edf`); with no
+arguments it runs all three (plus the figures), and passing all three is equivalent to
+passing none:
+
+```bash
+bash workspace/framework_paper/run_all.sh map       # only MAP (balanced + unbalanced)
+bash workspace/framework_paper/run_all.sh fp edf    # selected scenarios
+```
+
 This directory contains the evaluations used in the evaluation section of the paper
 (`src/06_evaluation.tex`), the scripts that run them, the generated data, and the scripts
 that produce the figures.
