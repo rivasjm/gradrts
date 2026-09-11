@@ -58,6 +58,12 @@ class FPMappingHandler(ParameterHandler):
         # parse priority values (last t values)
         self.fp_handler.insert(S, x[-t:])
 
+    def mapping_mask(self, S: LinearSystem) -> [bool]:
+        """True for the mapping block (first p*t coordinates), False for priorities."""
+        p = len(S.processors)
+        t = len(S.tasks)
+        return [True] * (p * t) + [False] * t
+
 
 class DeadlineMappingHandler(ParameterHandler):
     def __init__(self):
@@ -86,6 +92,12 @@ class DeadlineMappingHandler(ParameterHandler):
 
         # parse priority values (last t values)
         self.deadline_handler.insert(S, x[-t:])
+
+    def mapping_mask(self, S: LinearSystem) -> [bool]:
+        """True for the mapping block (first p*t coordinates), False for deadlines."""
+        p = len(S.processors)
+        t = len(S.tasks)
+        return [True] * (p * t) + [False] * t
 
 
 class MappingHandler(ParameterHandler):

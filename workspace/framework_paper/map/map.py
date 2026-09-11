@@ -41,7 +41,9 @@ def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
     stop_function = ThresholdStopFunction(limit=limit)
     gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix())
 
-    update_function = NoisyAdam()
+    update_function = NoisyAdam(
+        warmup_iterations=30,
+        warmup_mask=parameter_handler.mapping_mask(system))
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                          cost_function=cost_function,
                                          stop_function=stop_function,

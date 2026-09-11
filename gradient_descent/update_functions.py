@@ -64,9 +64,19 @@ class Adam(UpdateFunction):
 
 
 class NoisyAdam(UpdateFunction):
-    def __init__(self, lr=3, beta1=0.9, beta2=0.999, epsilon=0.1, gamma=0.9, seed=1):
+    """Adam with decaying gradient noise.
+
+    ``warmup_mask`` marks the coordinates that stay frozen (update set to zero)
+    for the first ``warmup_iterations`` iterations. This lets other parameter
+    blocks converge before the masked block starts moving (e.g. freeze a
+    one-hot mapping block while the priorities settle)."""
+
+    def __init__(self, lr=3, beta1=0.9, beta2=0.999, epsilon=0.1, gamma=0.9, seed=1,
+                 warmup_iterations=0, warmup_mask=None):
         self.noise = GradientNoise(lr=lr, gamma=gamma, seed=seed)
         self.adam = Adam(lr=lr, beta1=beta1, beta2=beta2, epsilon=epsilon)
+        self.warmup_iterations = warmup_iterations
+        self.warmup_mask = None if warmup_mask is None else list(warmup_mask)
 
     def reset(self):
         self.noise.reset()
@@ -75,4 +85,7 @@ class NoisyAdam(UpdateFunction):
     def update(self, S: SystemModel, x: [float], nabla: [float], t: int) -> [float]:
         noisy_gradient = self.noise.update(S, x, nabla, t)
         update = self.adam.update(S, x, noisy_gradient, t)
+        if self.warmup_mask is not None and t <= self.warmup_iterations:
+            assert len(self.warmup_mask) == len(update)
+            update = [0.0 if m else u for u, m in zip(update, self.warmup_mask)]
         return update
