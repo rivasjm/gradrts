@@ -1,21 +1,36 @@
 import math
+import time
 
 from model.analysis_function import AnalysisFunction, reset_wcrt, init_wcrt, higher_priority
 from model.linear_system import LinearSystem
 
 
 class HolisticFPAnalysis(AnalysisFunction):
-    def __init__(self, limit_factor=10, reset=False, verbose=False):
+    def __init__(self, limit_factor=10, reset=False, verbose=False, max_time=None):
         self.limit_factor = limit_factor
         self.reset = reset
         self.verbose = verbose
+        self.max_time = max_time
+        self._start = None
 
     def reset_wcrts(self, system: LinearSystem):
         if self.reset:
             reset_wcrt(system)
 
+    def _timeout(self) -> bool:
+        return self.max_time is not None and time.perf_counter() - self._start > self.max_time
+
+    def _abort(self, system: LinearSystem, task):
+        """Behave as if ``task`` reached its response-time limit."""
+        if self.reset:
+            self.reset_wcrts(system)
+        else:
+            for t in task.all_successors:
+                t.wcrt = task.wcrt
+
     def apply(self, system: LinearSystem) -> None:
         init_wcrt(system)
+        self._start = time.perf_counter()
 
         wcrts = [t.wcrt for t in system.tasks]
         wcrts_prev = [0 for t in system.tasks]
@@ -41,12 +56,8 @@ class HolisticFPAnalysis(AnalysisFunction):
                             print(f"{task.name} p={p} w={w:.3f} wprev={w_prev:.3f} r={r:.3f} wcrt={task.wcrt:.3f}")
                         if r > task.wcrt:
                             task.wcrt = r
-                        if r > limit:
-                            if self.reset:
-                                self.reset_wcrts(system)
-                            else:
-                                for t in task.all_successors:
-                                    t.wcrt = task.wcrt
+                        if r > limit or self._timeout():
+                            self._abort(system, task)
                             return
 
                     if w <= p * task.period:

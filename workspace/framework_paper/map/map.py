@@ -34,12 +34,13 @@ def pd_fp(system: LinearSystem) -> bool:
     return system.is_schedulable()
 
 
-def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
+def gdpa_mapping_fp(system: LinearSystem, limit: int, max_time: float = None) -> bool:
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False, max_time=max_time)
     parameter_handler = FPMappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
-    stop_function = ThresholdStopFunction(limit=limit)
-    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix())
+    stop_function = ThresholdStopFunction(limit=limit, max_time=max_time)
+    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
+                                                 max_time=max_time)
 
     update_function = NoisyAdam(
         warmup_iterations=30,
@@ -65,6 +66,15 @@ if __name__ == '__main__':
     parser.add_argument("--unbalanced", action="store_true",
                         help="Start from an unbalanced initial mapping with uneven per-processor "
                              "load, and sweep utilization while keeping that mapping")
+    parser.add_argument("--max-time", type=float, default=None, metavar="SECONDS",
+                        help="Wall-clock budget per gdpa run (applied to both gdpa-100 and "
+                             "gdpa-200); the optimizer returns its best solution so far when "
+                             "exceeded. Default: no limit (the EDF scenario uses 120 s).")
+    parser.add_argument("--start", type=int, default=1,
+                        help="First utilization level to run, 1-based (default: 1). Levels "
+                             "before it are loaded from the results already present in the "
+                             "output directory, so an interrupted sweep can be resumed, "
+                             "e.g. --start 18")
     parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
                         help="Output directory for generated files (default: script directory)")
     args = parser.parse_args()
@@ -75,12 +85,14 @@ if __name__ == '__main__':
 
     # utilizations between 50 % and 90 %
     utilizations = np.linspace(0.5, 0.9, 20)
+    if not 1 <= args.start <= len(utilizations):
+        parser.error(f"--start must be between 1 and {len(utilizations)}")
 
     tools = [
         ("pd", pd_fp),
         ("hopa", hopa_fp),
-        ("gdpa-100", partial(gdpa_mapping_fp, limit=100)),
-        ("gdpa-200", partial(gdpa_mapping_fp, limit=200)),
+        ("gdpa-100", partial(gdpa_mapping_fp, limit=100, max_time=args.max_time)),
+        ("gdpa-200", partial(gdpa_mapping_fp, limit=200, max_time=args.max_time)),
     ]
 
     labels, funcs = zip(*tools)
@@ -90,4 +102,4 @@ if __name__ == '__main__':
                             systems=systems, utilizations=utilizations, threads=6,
                             utilization_func=utilization_func,
                             output_dir=output_dir)
-    runner.run()
+    runner.run(start_index=args.start - 1)

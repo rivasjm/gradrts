@@ -1,9 +1,15 @@
+import time
+
 import numpy as np
 
 from model.analysis_function import init_wcrt
 from gradient_descent.gradient_function import AvgSeparationDelta, gradient_inputs_from_deltas, gradient_from_costs
 from gradient_descent.interfaces import GradientFunction
 from model.linear_system import LinearSystem
+
+
+class _AnalysisTimeout(Exception):
+    """Raised internally when a wall-clock budget is exceeded during the analysis."""
 
 
 class ResultsCache:
@@ -57,10 +63,12 @@ class PriorityScenarios:
 
 
 class VectorFPGradientFunction(GradientFunction):
-    def __init__(self, scenarios_builder: PriorityScenarios, sigma=1.5, cost_limit_factor=10):
+    def __init__(self, scenarios_builder: PriorityScenarios, sigma=1.5, cost_limit_factor=10,
+                 max_time=None):
         self.delta_function = AvgSeparationDelta(sigma=sigma)
         self.scenarios_builder = scenarios_builder
         self.cost_limit_factor = cost_limit_factor
+        self.max_time = max_time
         self.cache = ResultsCache()
 
     def reset(self):
@@ -71,7 +79,8 @@ class VectorFPGradientFunction(GradientFunction):
         n = len(tasks)
         priority_matrices = self.scenarios_builder.apply(system, inputs)
         deadlines = np.array([task.flow.deadline for task in tasks]).reshape(n, 1)
-        vholistic = VectorHolisticFPAnalysis(limit_factor=self.cost_limit_factor, verbose=False, cache=self.cache)
+        vholistic = VectorHolisticFPAnalysis(limit_factor=self.cost_limit_factor, verbose=False,
+                                             cache=self.cache, max_time=self.max_time)
         vholistic.apply(system, scenarios=priority_matrices)
         r = vholistic.scenarios_response_times
         costs = np.max((r - deadlines) / deadlines, axis=0)
@@ -165,10 +174,11 @@ class PrioritiesMatrix(PriorityScenarios):
 
 
 class VectorHolisticFPAnalysis:
-    def __init__(self, verbose=False, limit_factor=10, cache: ResultsCache = None):
+    def __init__(self, verbose=False, limit_factor=10, cache: ResultsCache = None, max_time=None):
         self.verbose = verbose
         self.limit_factor = limit_factor
         self.cache = cache if cache is not None else ResultsCache()
+        self.max_time = max_time
         self._scenarios_response_times = None
         self._full_response_times = None
 
@@ -187,10 +197,15 @@ class VectorHolisticFPAnalysis:
         return self._full_response_times
 
     @staticmethod
-    def _analysis(priority_matrix, wcets, periods, deadlines, successors, wcrts, jitters, cache, verbose=False, limit=10):
+    def _analysis(priority_matrix, wcets, periods, deadlines, successors, wcrts, jitters, cache, verbose=False, limit=10, max_time=None):
         assert wcets.shape == periods.shape == deadlines.shape == successors.shape == wcrts.shape == jitters.shape
         assert wcets.shape[1] == 1
         assert priority_matrix.shape[1] == wcets.shape[0]
+
+        # wall-clock budget for this analysis; scenarios still pending when it
+        # expires are cached as infeasible (same as the over-utilization shortcut)
+        start = time.perf_counter()
+        timed_out = False
 
         # working priority matrix. initially with every scenario. scenarios will pop-out when they finish
         pm = priority_matrix.copy()  # size (s, t, t)
@@ -240,7 +255,7 @@ class VectorHolisticFPAnalysis:
             print("Starting Holistic FP analysis (vectorized, cached)")
 
         # response time convergence loop
-        while pm.size > 0:
+        while pm.size > 0 and not timed_out:
             r_max_prev = r_max
 
             # iterate p=1,2,... until w<=p*T
@@ -250,7 +265,10 @@ class VectorHolisticFPAnalysis:
             p_mask = np.full(r.shape, False)  # (s, t, 1)
 
             # p iterations loop
-            while not np.all(p_mask):
+            while not np.all(p_mask) and not timed_out:
+                if max_time is not None and time.perf_counter() - start > max_time:
+                    timed_out = True
+                    break
                 # no more p when w <= p*T
                 stop_p = p * periods
 
@@ -261,6 +279,9 @@ class VectorHolisticFPAnalysis:
 
                 # w convergence loop
                 while not np.allclose(w, w_prev):
+                    if max_time is not None and time.perf_counter() - start > max_time:
+                        timed_out = True
+                        break
                     w_prev = w
 
                     # Eq. (1) of "On the schedulability Analysis for Distributed Hard Real-Time Systems"
@@ -299,12 +320,17 @@ class VectorHolisticFPAnalysis:
             # now identify scenenarios with WCRT's that haven't changed from the previous iterations
             # those scenarios are considered finished -> cache their results
 
-            converged = converged_scenarios(r_max, r_max_prev)  # (s) boolean vector
-            cache_scenario_results(r_max, pm, converged, cache)
-            pm, r_max, r, r_max_prev, j, p_mask = remove_scenarios(converged, pm, r_max, r, r_max_prev, j, p_mask)
+            if not timed_out:
+                converged = converged_scenarios(r_max, r_max_prev)  # (s) boolean vector
+                cache_scenario_results(r_max, pm, converged, cache)
+                pm, r_max, r, r_max_prev, j, p_mask = remove_scenarios(converged, pm, r_max, r, r_max_prev, j, p_mask)
 
-            if verbose:
-                print(f"p finished for all tasks, converged scenarios={np.sum(converged)}")
+                if verbose:
+                    print(f"p finished for all tasks, converged scenarios={np.sum(converged)}")
+
+        # scenarios still pending when the budget expired are cached as infeasible
+        if timed_out and pm.size > 0:
+            cache_over_limit(pm, over_limit_response, cache)
 
         res = build_results_from_cache(priority_matrix, cache)  # 2D matrix (t, s)
 
@@ -332,7 +358,8 @@ class VectorHolisticFPAnalysis:
 
         # get response times for all scenarios. r is a 2D matrix (t, s+1)
         r = self._analysis(pm, wcets, periods, deadlines, successors, wcrts, jitters,
-                           self.cache, verbose=self.verbose, limit=self.limit_factor)
+                           self.cache, verbose=self.verbose, limit=self.limit_factor,
+                           max_time=self.max_time)
 
         # set the response times of the first scenario as the wcrt of the input system
         # first scenario is the first column of s

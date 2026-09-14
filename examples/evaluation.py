@@ -94,7 +94,7 @@ class SchedRatioEval:
         self.start = None
         self.output_dir = output_dir or os.getcwd()
 
-    def run(self):
+    def run(self, start_index=0):
         """Run the full evaluation sweep. Generates PNG and XLSX files in output_dir.
 
         Reports:
@@ -102,14 +102,22 @@ class SchedRatioEval:
         - ``times``: average execution time over all systems.
         - ``times_success``: average execution time over the systems each method
           made schedulable (undefined -> NaN where no system succeeded).
+
+        ``start_index`` (0-based) skips the first utilization levels and loads their
+        results from the files already present in ``output_dir``, so an interrupted
+        sweep can be resumed (e.g. of levels 1..17 already saved).
         """
         self.start = time.time()
-        job = 0
         all_results = np.zeros((len(self.utilizations), len(self.labels)))
         all_times = np.zeros((len(self.utilizations), len(self.labels)))
         all_success_times = np.zeros((len(self.utilizations), len(self.labels)))
+        if start_index > 0:
+            self._load_existing(all_results, all_times, all_success_times, start_index)
+        job = start_index * len(self.systems)
 
         for u_index, u in enumerate(self.utilizations):
+            if u_index < start_index:
+                continue
             for s in self.systems:
                 self.utilization_func(s, u)
                 if self.preprocessor:
@@ -117,7 +125,7 @@ class SchedRatioEval:
 
             with Pool(self.threads) as pool:
                 f = partial(self._step, u_index=u_index)
-                for scheds, times, success_times in pool.imap_unordered(f, self.systems):
+                for sys_name, scheds, times, success_times in pool.imap_unordered(f, self.systems):
                     job += 1
                     all_results[u_index, :] += scheds
                     all_times[u_index, :] += times
@@ -130,7 +138,7 @@ class SchedRatioEval:
                         for lbl, c in zip(self.labels, cumulative))
                     print(f"{datetime.now():%H:%M:%S} {self.name} u={u:.3f} "
                           f"({u_index + 1}/{len(self.utilizations)}) "
-                          f"job={job}/{total} | {methods} | elapsed={elapsed:.0f}s")
+                          f"job={job}/{total} sys={sys_name} | {methods} | elapsed={elapsed:.0f}s")
 
             self._save(all_results, "schedulables")
             self._save(all_times / len(self.systems), "times", formats=("xlsx",))
@@ -140,6 +148,30 @@ class SchedRatioEval:
             # Aggregate efficiency scatter (total schedulable vs success time),
             # regenerated after each utilization with the data so far
             self._efficiency_chart(all_results, all_success_times)
+
+    def _load_existing(self, all_results, all_times, all_success_times, start_index):
+        """Seed the accumulators with the results of the levels before ``start_index``.
+
+        The saved ``times`` are means over all systems and ``times_success`` means
+        over the schedulable ones; both are converted back to the sums held in
+        memory. Missing files abort the resume instead of silently overwriting.
+        """
+        files = {
+            name: self._path(f"{self.name}_{name}.xlsx")
+            for name in ("schedulables", "times", "times_success")
+        }
+        missing = [p for p in files.values() if not os.path.exists(p)]
+        if missing:
+            raise FileNotFoundError(
+                f"Cannot resume from level {start_index + 1}: missing {missing}. "
+                f"Run without --start to compute from scratch.")
+        columns = list(self.labels)
+        sched = pd.read_excel(files["schedulables"], index_col=0)[columns].to_numpy()[:start_index]
+        times = pd.read_excel(files["times"], index_col=0)[columns].to_numpy()[:start_index]
+        succ = pd.read_excel(files["times_success"], index_col=0)[columns].to_numpy()[:start_index]
+        all_results[:start_index] = sched
+        all_times[:start_index] = times * len(self.systems)
+        all_success_times[:start_index] = np.nan_to_num(succ) * sched
 
     @staticmethod
     def _success_mean(success_times, counts):
@@ -170,7 +202,7 @@ class SchedRatioEval:
                 restore_assignment(system, a)
                 results[f] = 0
                 times[f] = 0
-        return results, times, success_times
+        return system.name, results, times, success_times
 
     def _save(self, data, suffix, formats=FORMATS):
         """Save ``data`` as the selected files: ``"line"`` (line chart PNG),
