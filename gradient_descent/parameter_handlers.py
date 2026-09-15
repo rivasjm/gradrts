@@ -4,17 +4,24 @@ import math
 
 
 class DeadlineHandler(ParameterHandler):
+    """Normalized local-deadline parameters in [0, 1].
+
+    ``extract`` and ``insert`` are exact inverses relative to the largest flow
+    deadline, so the optimizer starts from the assigned (e.g. PD) deadlines
+    instead of a distorted version of them. Values outside [0, 1] produced by
+    the updates are clamped, which bounds the search to valid deadlines.
+    """
+
     def extract(self, system: LinearSystem) -> [float]:
         max_d = max([flow.deadline for flow in system.flows])
-        x = [sigmoid(t.deadline / max_d) for t in system.tasks]
-        return x
+        return [t.deadline / max_d for t in system.tasks]
 
     def insert(self, system: LinearSystem, x: [float]):
         max_d = max([flow.deadline for flow in system.flows])
         tasks = system.tasks
         assert len(tasks) == len(x)
-        for v, t in zip(x, system.tasks):
-            t.deadline = v * max_d                   
+        for v, t in zip(x, tasks):
+            t.deadline = min(max(v, 0.0), 1.0) * max_d
 
 
 class FPHandler(ParameterHandler):
