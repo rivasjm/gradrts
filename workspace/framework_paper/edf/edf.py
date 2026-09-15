@@ -40,7 +40,9 @@ def edf_local_gdpa(system: LinearSystem, max_time: float = None) -> bool:
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100, max_time=max_time)
     gradient_function = SequentialGradientFunction(cost_function=cost_function)
-    update_function = NoisyAdam()
+    # lr=1.0 (instead of the default 3.0) selected by workspace/edf_tuning:
+    # on size 25 it reaches 49/50 at u=0.66/0.68 vs 46/40 for HOPA.
+    update_function = NoisyAdam(lr=1.0)
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                         cost_function=cost_function,
                                         stop_function=stop_function,
