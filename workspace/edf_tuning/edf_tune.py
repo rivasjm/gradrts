@@ -233,10 +233,18 @@ def build_phase(phase):
             dict(BASE, handler="perflow", limit=100, patience=30),
             dict(BASE, handler="linear", limit=200),
         ]
+    if phase == "confirm":
+        # Winners of the update phase at u=0.68, to validate at other levels.
+        return [
+            dict(BASE, handler="linear", lr=1.0),
+            dict(BASE, handler="linear", noise=False, lr=1.0),
+            dict(BASE, handler="perflow", lr=1.0),
+            dict(BASE, handler="linear", lr=1.0, limit=200),
+        ]
     raise SystemExit(f"unknown phase {phase!r} (use --list)")
 
 
-PHASES = ("baseline", "candidate", "handlers", "update", "gradient", "stop")
+PHASES = ("baseline", "candidate", "handlers", "update", "gradient", "stop", "confirm")
 
 
 # --------------------------------------------------------------------------
