@@ -140,10 +140,12 @@ def make_handler(kind):
 
 
 def gdpa_run(system, cfg):
-    analysis = HolisticLocalEDFAnalysis(limit_factor=cfg.get("lf", 10), reset=False)
+    analysis = HolisticLocalEDFAnalysis(limit_factor=cfg.get("lf", 10), reset=False,
+                                        max_time=cfg.get("max_time"))
     handler = make_handler(cfg["handler"])
     cost = InvslackCost(parameter_handler=handler, analysis=analysis)
-    stop = ThresholdStopFunction(limit=cfg["limit"], patience=cfg.get("patience"))
+    stop = ThresholdStopFunction(limit=cfg["limit"], patience=cfg.get("patience"),
+                                 max_time=cfg.get("max_time"))
     gradient = SequentialGradientFunction(cost_function=cost, sigma=cfg.get("sigma", 1.5))
     if cfg.get("noise", True):
         update = NoisyAdam(lr=cfg.get("lr", 3.0), gamma=cfg.get("gamma", 0.9),
@@ -170,6 +172,8 @@ def label(cfg):
         parts.append(f"sigma={cfg['sigma']}")
     if cfg.get("patience"):
         parts.append(f"pat={cfg['patience']}")
+    if cfg.get("max_time"):
+        parts.append(f"mt={cfg['max_time']}")
     return ",".join(parts)
 
 
@@ -190,7 +194,9 @@ def _worker(args):
     idx, u, cfg = args
     system = copy.deepcopy(_BASE[idx])
     set_utilization(system, u)
-    return idx, gdpa_run(system, cfg)
+    t0 = time.perf_counter()
+    ok = gdpa_run(system, cfg)
+    return idx, ok, time.perf_counter() - t0
 
 
 def _pd(system):
@@ -241,10 +247,28 @@ def build_phase(phase):
             dict(BASE, handler="perflow", lr=1.0),
             dict(BASE, handler="linear", lr=1.0, limit=200),
         ]
+    if phase == "high":
+        # Very high utilization: check whether max_time is cutting the runs and
+        # whether the deadline encoding (not the budget) is what changes results.
+        return [
+            dict(BASE, handler="linear", lr=1.0),
+            dict(BASE, handler="linear", lr=1.0, max_time=1800),
+            dict(BASE, handler="perflow", lr=1.0),
+            dict(BASE, handler="sigmoid", lr=1.0),
+        ]
+    if phase == "highlf":
+        # Very high utilization: the analysis limit_factor controls how early an
+        # infeasible configuration is aborted (and whether the cost keeps a
+        # gradient). Larger values give more signal at the cost of time.
+        return [
+            dict(BASE, handler="linear", lr=1.0, lf=20),
+            dict(BASE, handler="linear", lr=1.0, lf=50),
+            dict(BASE, handler="linear", lr=3.0, lf=20),
+        ]
     raise SystemExit(f"unknown phase {phase!r} (use --list)")
 
 
-PHASES = ("baseline", "candidate", "handlers", "update", "gradient", "stop", "confirm")
+PHASES = ("baseline", "candidate", "handlers", "update", "gradient", "stop", "confirm", "high", "highlf")
 
 
 # --------------------------------------------------------------------------
@@ -305,10 +329,12 @@ def main():
                 for cfg in build_phase(phase):
                     t0 = time.perf_counter()
                     results = pool.map(_worker, [(i, u, cfg) for i in indices])
-                    count = sum(int(ok) for _, ok in results)
+                    count = sum(int(ok) for _, ok, _ in results)
+                    max_run = max(dt for _, _, dt in results)
                     dt = time.perf_counter() - t0
                     lab = label(cfg)
-                    print(f"  {lab:60s} {count}/{len(indices)} ({dt:.1f}s)", flush=True)
+                    print(f"  {lab:60s} {count}/{len(indices)} ({dt:.1f}s, "
+                          f"max_run={max_run:.0f}s)", flush=True)
                     summary.append((u, lab, count, len(indices)))
 
     print("\n=== SUMMARY ===")
