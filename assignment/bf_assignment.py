@@ -111,19 +111,34 @@ class BruteForceFPAssignment(AnalysisFunction):
 
 
 class BruteForceFPMappingAssignment(AnalysisFunction):
-    def __init__(self, batch_size=10000, verbose=False):
+    def __init__(self, batch_size=10000, verbose=False, prune=True):
         self.batch_size = batch_size if batch_size > 0 else 1
         self.verbose = verbose
+        self.prune = prune
         self.analysis = VectorHolisticFPAnalysis(limit_factor=1)
         self.schedulable = False
         self.exec_time = ExecTime()
         self.iterations_to_sched = -1
         self.space_size = 0
+        self.evaluated = 0
+
+    @staticmethod
+    def _over_utilized(mapping_tuple, utilization, pi):
+        """True when some processor's total utilisation reaches 1.
+
+        Such a partition cannot be schedulable under fixed priorities, and the
+        vectorized analysis discards it as well, so skipping it is exact.
+        """
+        per_proc = np.zeros(pi)
+        for task_idx, proc in enumerate(mapping_tuple):
+            per_proc[proc] += utilization[task_idx]
+        return bool(np.any(per_proc >= 1.0))
 
     def apply(self, system: LinearSystem) -> LinearSystem:
         self.exec_time.init()
         self.schedulable = False
         self.iterations_to_sched = -1
+        self.evaluated = 0
 
         PDAssignment(normalize=True).apply(system)
 
@@ -131,6 +146,7 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
         n = len(tasks)
         procs = system.processors
         pi = len(procs)
+        utilization = np.array([t.wcet / t.period for t in tasks])
 
         mapping_space = list(itertools.product(range(pi), repeat=n))
         perms_per_mapping = []
@@ -146,6 +162,9 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
         processed = 0
 
         for mapping_tuple, n_perms in zip(mapping_space, perms_per_mapping):
+            if self.prune and self._over_utilized(mapping_tuple, utilization, pi):
+                continue
+
             proc_task_indices = [[] for _ in range(pi)]
             for task_idx, proc in enumerate(mapping_tuple):
                 proc_task_indices[proc].append(task_idx)
@@ -162,12 +181,13 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
                 pm = self._single_priority_matrix(mapping_tuple, priorities, n)
                 pm_batch.append(pm)
                 solutions_batch.append((mapping_tuple, tuple(priorities)))
+                self.evaluated += 1
 
                 if len(pm_batch) == self.batch_size:
                     processed += len(pm_batch)
                     if self.verbose:
-                        print(f"Processed {processed}/{self.space_size} "
-                              f"({processed / self.space_size * 100:.3f}%)")
+                        print(f"Processed {processed} candidates "
+                              f"(space={self.space_size}, evaluated={self.evaluated})")
                     if self._process_batch(system, pm_batch, solutions_batch):
                         self.iterations_to_sched = processed
                         if self.verbose:
@@ -180,8 +200,6 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
         if len(pm_batch) > 0 and not self.schedulable:
             if self._process_batch(system, pm_batch, solutions_batch):
                 self.iterations_to_sched = processed + len(pm_batch)
-                if self.verbose:
-                    print("Schedulable solution found")
 
         self.exec_time.stop()
         return system

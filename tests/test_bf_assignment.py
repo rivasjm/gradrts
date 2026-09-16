@@ -244,6 +244,26 @@ class BruteForceMappingTest(unittest.TestCase):
         self.assertIsInstance(bf.schedulable, bool)
 
 
+class BruteForceMappingPruneTest(unittest.TestCase):
+    """The over-utilization prune must not change the verdict."""
+
+    def test_prune_preserves_verdict(self):
+        for size in [(1, 2, 2), (2, 2, 2), (2, 3, 2), (1, 3, 2)]:
+            for seed in range(3):
+                for util in (0.5, 0.7, 0.9):
+                    with self.subTest(size=size, seed=seed, util=util):
+                        pruned = get_system(size, random=Random(seed),
+                                            utilization=util, balanced=True)
+                        full = get_system(size, random=Random(seed),
+                                          utilization=util, balanced=True)
+                        bf_pruned = BruteForceFPMappingAssignment(batch_size=100, prune=True)
+                        bf_pruned.apply(pruned)
+                        bf_full = BruteForceFPMappingAssignment(batch_size=100, prune=False)
+                        bf_full.apply(full)
+                        self.assertEqual(bf_pruned.schedulable, bf_full.schedulable)
+                        self.assertLessEqual(bf_pruned.evaluated, bf_full.space_size)
+
+
 class BruteForceMappingOnlyTest(unittest.TestCase):
 
     def test_space_size(self):
