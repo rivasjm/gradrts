@@ -18,6 +18,9 @@ from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
 from workspace.framework_paper.systems import SIZES, get_systems
 
+# utilizations between 50 % and 90 %
+UTILIZATIONS = np.linspace(0.5, 0.9, 20)
+
 
 def item(system, assignment, test):
     assignment.apply(system)
@@ -54,14 +57,11 @@ def edf_local_gdpa(system: LinearSystem, max_time: float = None) -> bool:
     return item(system, optimizer, HolisticLocalEDFAnalysis(limit_factor=1, reset=True))
 
 
-def run_size(size: int, max_time: float, base_output_dir: str) -> None:
+def run_size(size: int, max_time: float, base_output_dir: str, start_index: int = 0) -> None:
     eval_name = f"edf-{size}"
     systems = get_systems(size)
     for system in systems:
         to_edf(system)
-
-    # utilizations between 50 % and 90 %
-    utilizations = np.linspace(0.5, 0.9, 20)
 
     tools = [("pd", edf_local_pd),
              ("hopa", edf_local_hopa),
@@ -71,9 +71,9 @@ def run_size(size: int, max_time: float, base_output_dir: str) -> None:
     output_dir = os.path.join(base_output_dir, eval_name)
     os.makedirs(output_dir, exist_ok=True)
     runner = SchedRatioEval(eval_name, labels=labels, funcs=funcs,
-                            systems=systems, utilizations=utilizations, threads=6,
+                            systems=systems, utilizations=UTILIZATIONS, threads=6,
                             output_dir=output_dir)
-    runner.run()
+    runner.run(start_index=start_index)
 
 
 if __name__ == '__main__':
@@ -85,9 +85,17 @@ if __name__ == '__main__':
                         help="Wall-clock budget per gdpa run, applied to both the analysis and "
                              "the optimizer stop function; the optimizer returns its best "
                              "solution so far when exceeded. Default: no limit.")
+    parser.add_argument("--start", type=int, default=1,
+                        help="First utilization level to run, 1-based (default: 1). Levels "
+                             "before it are loaded from the results already present in the "
+                             "output directory, so an interrupted sweep can be resumed, "
+                             "e.g. --start 19")
     parser.add_argument("-o", "--output-dir", default=os.path.dirname(os.path.abspath(__file__)),
                         help="Output directory for generated files (default: script directory)")
     args = parser.parse_args()
 
+    if not 1 <= args.start <= len(UTILIZATIONS):
+        parser.error(f"--start must be between 1 and {len(UTILIZATIONS)}")
+
     for size in (args.size or sorted(SIZES)):
-        run_size(size, args.max_time, args.output_dir)
+        run_size(size, args.max_time, args.output_dir, args.start - 1)
