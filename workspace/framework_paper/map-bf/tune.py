@@ -74,9 +74,31 @@ class BlockDelta(AvgSeparationDelta):
         return out
 
 
-def gdpa_run(system, cfg):
+class MarginMappingHandler(FPMappingHandler):
+    """FPMappingHandler with a different initial margin between the current
+    processor and the others (default is 0.55 vs 0.45)."""
+
+    def __init__(self, current=0.55, other=0.45):
+        super().__init__()
+        self._current = current
+        self._other = other
+
+    def extract(self, S):
+        mapping = [self._current if t.processor == p else self._other
+                   for t in S.tasks for p in S.processors]
+        return mapping + self.fp_handler.extract(S)
+
+
+def make_handler(cfg):
+    margin = cfg.get("margin")
+    if margin is None:
+        return FPMappingHandler()
+    return MarginMappingHandler(current=margin[0], other=margin[1])
+
+
+def _gdpa_once(system, cfg):
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    handler = FPMappingHandler()
+    handler = make_handler(cfg)
     cost = InvslackCost(parameter_handler=handler, analysis=analysis)
     stop = ThresholdStopFunction(limit=cfg.get("limit", 200))
     gradient = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
@@ -105,6 +127,17 @@ def gdpa_run(system, cfg):
     return system.is_schedulable()
 
 
+def gdpa_run(system, cfg):
+    """Run GDPA; with ``restarts`` > 1, retry with different seeds until one
+    finds a schedulable solution (multi-start on the same initial mapping)."""
+    restarts = cfg.get("restarts", 1)
+    for r in range(restarts):
+        candidate = copy.deepcopy(system)
+        if _gdpa_once(candidate, dict(cfg, seed=cfg.get("seed", 1) + r)):
+            return True
+    return False
+
+
 def label(cfg):
     parts = [f"lim={cfg.get('limit', 200)}", f"wu={cfg.get('warmup', 30)}",
              f"lr={cfg.get('lr', 3.0)}"]
@@ -119,6 +152,10 @@ def label(cfg):
         parts.append(f"pdelta={cfg['priority_delta']}")
     if cfg.get("seed", 1) != 1:
         parts.append(f"seed={cfg['seed']}")
+    if cfg.get("restarts", 1) > 1:
+        parts.append(f"restarts={cfg['restarts']}")
+    if cfg.get("margin") is not None:
+        parts.append(f"margin={cfg['margin']}")
     return ",".join(parts)
 
 
@@ -184,11 +221,32 @@ def build_phase(phase):
             dict(BASE, lr=10.0, mapping_delta=0.5, priority_delta=0.5),
             dict(BASE, sigma=3.0, mapping_delta=0.5),
         ]
+    if phase == "push":
+        best = dict(BASE, lr=10.0, mapping_delta=1.0, priority_delta=1.0)
+        return [
+            dict(BASE, lr=10.0, mapping_delta=0.5, priority_delta=0.5),
+            best,
+            dict(BASE, lr=10.0, mapping_delta=2.0, priority_delta=2.0),
+            dict(BASE, lr=20.0, mapping_delta=1.0, priority_delta=1.0),
+            dict(best, limit=500),
+            dict(best, gamma=0.95),
+            dict(best, seed=2),
+        ]
+    if phase == "alt":
+        best = dict(BASE, lr=10.0, mapping_delta=1.0, priority_delta=1.0)
+        return [
+            best,
+            dict(best, restarts=3),
+            dict(best, restarts=5),
+            dict(best, margin=(0.8, 0.2)),
+            dict(best, margin=(0.95, 0.05)),
+            dict(BASE, margin=(0.8, 0.2)),
+        ]
     raise SystemExit(f"unknown phase {phase!r} (use --list)")
 
 
 PHASES = ("baseline", "warmup", "lr", "sigma", "mapdelta", "noise", "limit",
-          "study", "combine")
+          "study", "combine", "push", "alt")
 
 
 def main():
