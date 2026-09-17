@@ -46,6 +46,9 @@ DEADLINE_FACTOR_MIN = 0.5
 DEADLINE_FACTOR_MAX = 1
 PERIOD_MIN = 100
 PERIOD_MAX = 1000
+# HOPA runs up to 160 scalar analyses; some systems make a single analysis
+# converge pathologically slowly, so each call is capped (baseline only).
+HOPA_ANALYSIS_MAX_TIME = 0.5
 # utilizations between 50 % and 90 %
 UTILIZATIONS = np.linspace(0.5, 0.9, 20)
 
@@ -68,7 +71,8 @@ def pd_mapping_fp(system: LinearSystem) -> bool:
 
 
 def hopa_mapping_fp(system: LinearSystem) -> bool:
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
+                                  max_time=HOPA_ANALYSIS_MAX_TIME)
     HOPAssignment(analysis=analysis).apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
