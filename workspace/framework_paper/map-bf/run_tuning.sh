@@ -45,7 +45,7 @@ echo "Log: $LOG"
 echo
 
 "$PY" workspace/framework_paper/map-bf/tune.py \
-    --phase "$PHASE" --n "$N" --threads "$THREADS" "${U_ARGS[@]}" \
+    --phase "$PHASE" --n "$N" --threads "$THREADS" ${U_ARGS[@]+"${U_ARGS[@]}"} \
     2>&1 | tee -a "$LOG"
 
 echo
