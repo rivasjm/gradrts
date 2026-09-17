@@ -25,6 +25,7 @@ import numpy as np
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from assignment.assignments import PDAssignment
 from assignment.bf_assignment import BruteForceFPMappingAssignment
+from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
 from examples.generator import set_system_utilization
@@ -57,6 +58,20 @@ def get_systems(n=POPULATION):
                        deadline_factor_max=DEADLINE_FACTOR_MAX,
                        period_min=PERIOD_MIN, period_max=PERIOD_MAX)
             for i in range(n)]
+
+
+def pd_mapping_fp(system: LinearSystem) -> bool:
+    pd = PDAssignment(normalize=True)
+    pd.apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
+
+
+def hopa_mapping_fp(system: LinearSystem) -> bool:
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
+    HOPAssignment(analysis=analysis).apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
 
 
 def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
@@ -110,6 +125,8 @@ if __name__ == '__main__':
     systems = get_systems(args.n)
 
     tools = [
+        ("pd", pd_mapping_fp),
+        ("hopa", hopa_mapping_fp),
         ("gdpa-100", partial(gdpa_mapping_fp, limit=100)),
         ("gdpa-200", partial(gdpa_mapping_fp, limit=200)),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
