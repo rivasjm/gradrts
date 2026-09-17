@@ -13,16 +13,20 @@ HERE = Path(__file__).resolve().parent
 NAME = "map-bf-9"
 
 STYLES = {
+    "pd": {"color": "#8B4513", "marker": "s", "ls": ":"},
+    "hopa": {"color": "#008000", "marker": "x", "ls": "--"},
     "gdpa-100": {"color": "#0000FF", "marker": "^", "ls": "-"},
     "gdpa-200": {"color": "#FF8C00", "marker": "v", "ls": "-"},
     "bf": {"color": "#FF0000", "marker": "*", "ls": "--"},
 }
 
+COLUMNS = ("pd", "hopa", "gdpa-100", "gdpa-200", "bf")
+
 
 def load():
     path = HERE / NAME / f"{NAME}_schedulables.xlsx"
     df = pd.read_excel(path, index_col=0)
-    return df[[c for c in ("gdpa-100", "gdpa-200", "bf") if c in df.columns]]
+    return df[[c for c in COLUMNS if c in df.columns]]
 
 
 def plot(df):
