@@ -49,7 +49,7 @@ PERIOD_MIN = 100
 PERIOD_MAX = 1000
 # HOPA runs up to 160 scalar analyses; some systems make a single analysis
 # converge pathologically slowly, so each call is capped (baseline only).
-HOPA_ANALYSIS_MAX_TIME = 0.5
+SCALAR_ANALYSIS_MAX_TIME = 0.5
 # utilizations between 50 % and 90 %
 UTILIZATIONS = np.linspace(0.5, 0.9, 20)
 
@@ -73,15 +73,20 @@ def pd_mapping_fp(system: LinearSystem) -> bool:
 
 def hopa_mapping_fp(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
-                                  max_time=HOPA_ANALYSIS_MAX_TIME)
+                                  max_time=SCALAR_ANALYSIS_MAX_TIME)
     HOPAssignment(analysis=analysis).apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
 
 
 def gdpa_prio_fp(system: LinearSystem) -> bool:
-    """GDPA optimizing only priorities, keeping the (contended) mapping."""
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
+    """GDPA optimizing only priorities, keeping the (contended) mapping.
+
+    Since the mapping cannot move, over-loaded processors keep the scalar
+    analysis near its pathological regime, so each call is capped like HOPA's.
+    """
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
+                                  max_time=SCALAR_ANALYSIS_MAX_TIME)
     parameter_handler = FPHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
