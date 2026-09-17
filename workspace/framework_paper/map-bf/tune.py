@@ -49,17 +49,29 @@ _BASE_SYSTEMS = None
 
 
 class BlockDelta(AvgSeparationDelta):
-    """Shared AvgSeparationDelta, but a custom step for the mapping block."""
+    """Shared AvgSeparationDelta, with independent steps per parameter block.
 
-    def __init__(self, sigma, mapping_prefix, mapping_delta):
+    Coordinates before ``mapping_prefix`` are the mapping block; the rest are
+    priorities. A ``None`` override keeps the shared delta for that block, so
+    the two blocks can be steered independently (e.g. a larger step for the
+    mapping without disturbing the priorities).
+    """
+
+    def __init__(self, sigma, mapping_prefix, mapping_delta=None, priority_delta=None):
         super().__init__(sigma=sigma)
         self.mapping_prefix = mapping_prefix
         self.mapping_delta = mapping_delta
+        self.priority_delta = priority_delta
 
     def apply(self, system, x):
         base = super().apply(system, x)
-        return [self.mapping_delta if i < self.mapping_prefix else base[i]
-                for i in range(len(x))]
+        out = []
+        for i in range(len(x)):
+            if i < self.mapping_prefix:
+                out.append(base[i] if self.mapping_delta is None else self.mapping_delta)
+            else:
+                out.append(base[i] if self.priority_delta is None else self.priority_delta)
+        return out
 
 
 def gdpa_run(system, cfg):
@@ -69,11 +81,12 @@ def gdpa_run(system, cfg):
     stop = ThresholdStopFunction(limit=cfg.get("limit", 200))
     gradient = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
                                         sigma=cfg.get("sigma", 1.5))
-    if cfg.get("mapping_delta") is not None:
+    if cfg.get("mapping_delta") is not None or cfg.get("priority_delta") is not None:
         p = len(system.processors)
         t = len(system.tasks)
         gradient.delta_function = BlockDelta(cfg.get("sigma", 1.5), p * t,
-                                             cfg["mapping_delta"])
+                                             mapping_delta=cfg.get("mapping_delta"),
+                                             priority_delta=cfg.get("priority_delta"))
     if cfg.get("noise", True):
         update = NoisyAdam(lr=cfg.get("lr", 3.0), gamma=cfg.get("gamma", 0.9),
                            seed=cfg.get("seed", 1),
@@ -102,6 +115,8 @@ def label(cfg):
         parts.append(f"sigma={cfg['sigma']}")
     if cfg.get("mapping_delta") is not None:
         parts.append(f"mdelta={cfg['mapping_delta']}")
+    if cfg.get("priority_delta") is not None:
+        parts.append(f"pdelta={cfg['priority_delta']}")
     if cfg.get("seed", 1) != 1:
         parts.append(f"seed={cfg['seed']}")
     return ",".join(parts)
@@ -156,10 +171,24 @@ def build_phase(phase):
             dict(BASE, gamma=0.99),
             dict(BASE, seed=2),
         ]
+    if phase == "combine":
+        return [
+            dict(BASE, lr=10.0),
+            dict(BASE, mapping_delta=0.5),
+            dict(BASE, lr=10.0, mapping_delta=0.5),
+            dict(BASE, mapping_delta=1.0),
+            dict(BASE, lr=10.0, mapping_delta=1.0),
+            dict(BASE, priority_delta=0.5),
+            dict(BASE, priority_delta=1.0),
+            dict(BASE, mapping_delta=0.5, priority_delta=0.5),
+            dict(BASE, lr=10.0, mapping_delta=0.5, priority_delta=0.5),
+            dict(BASE, sigma=3.0, mapping_delta=0.5),
+        ]
     raise SystemExit(f"unknown phase {phase!r} (use --list)")
 
 
-PHASES = ("baseline", "warmup", "lr", "sigma", "mapdelta", "noise", "limit", "study")
+PHASES = ("baseline", "warmup", "lr", "sigma", "mapdelta", "noise", "limit",
+          "study", "combine")
 
 
 def main():
