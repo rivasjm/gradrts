@@ -15,12 +15,13 @@ NAME = "map-bf-9"
 STYLES = {
     "pd": {"color": "#8B4513", "marker": "s", "ls": ":"},
     "hopa": {"color": "#008000", "marker": "x", "ls": "--"},
+    "gdpa-prio": {"color": "#9467BD", "marker": "D", "ls": "-"},
     "gdpa-100": {"color": "#0000FF", "marker": "^", "ls": "-"},
     "gdpa-200": {"color": "#FF8C00", "marker": "v", "ls": "-"},
     "bf": {"color": "#FF0000", "marker": "*", "ls": "--"},
 }
 
-COLUMNS = ("pd", "hopa", "gdpa-100", "gdpa-200", "bf")
+COLUMNS = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "bf")
 
 
 def load():

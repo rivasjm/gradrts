@@ -1,0 +1,55 @@
+"""Merge method columns from partial map-bf runs into the main results.
+
+A run of ``bf.py`` restricted with ``--methods`` writes a full ``map-bf-9/``
+directory containing only those methods. Since every metric (schedulables,
+times, times_success) is computed per method, those columns can simply be
+combined with the existing results, as if all methods had been run together.
+
+Usage (from ``code/``):
+
+    python workspace/framework_paper/map-bf/merge_methods.py \
+        --target workspace/framework_paper/map-bf/map-bf-9 \
+        --source /tmp/gprio/map-bf-9
+"""
+
+import argparse
+from pathlib import Path
+
+import pandas as pd
+
+NAME = "map-bf-9"
+SUFFIXES = ("schedulables", "times", "times_success")
+ORDER = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "bf")
+
+
+def merge(target_file, source_files, order):
+    frames = [pd.read_excel(target_file, index_col=0)]
+    frames += [pd.read_excel(f, index_col=0) for f in source_files if Path(f).exists()]
+    df = pd.concat(frames, axis=1)
+    df = df.loc[:, ~df.columns.duplicated()]
+    cols = [c for c in order if c in df.columns]
+    cols += [c for c in df.columns if c not in order]
+    return df[cols]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--target", required=True, help="directory with the full results")
+    parser.add_argument("--source", nargs="+", required=True,
+                        help="directory(ies) with partial runs to merge in")
+    args = parser.parse_args()
+
+    target = Path(args.target)
+    for suffix in SUFFIXES:
+        target_file = target / f"{NAME}_{suffix}.xlsx"
+        if not target_file.exists():
+            raise SystemExit(f"missing {target_file}")
+        source_files = [Path(s) / f"{NAME}_{suffix}.xlsx" for s in args.source]
+        df = merge(target_file, source_files, ORDER)
+        df.to_excel(target_file)
+        print(f"{target_file}: {list(df.columns)}")
+
+
+if __name__ == "__main__":
+    main()

@@ -31,11 +31,12 @@ from examples.example_models import get_system
 from examples.generator import set_system_utilization
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import FPMappingHandler
+from gradient_descent.parameter_handlers import FPHandler, FPMappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
-from vector.vector_fp import MappingPrioritiesMatrix, VectorFPGradientFunction
+from vector.vector_fp import (MappingPrioritiesMatrix, PrioritiesMatrix,
+                              VectorFPGradientFunction)
 
 # flows x tasks per flow x processors -> 9 tasks
 SIZE = (3, 3, 3)
@@ -74,6 +75,28 @@ def hopa_mapping_fp(system: LinearSystem) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
                                   max_time=HOPA_ANALYSIS_MAX_TIME)
     HOPAssignment(analysis=analysis).apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
+
+
+def gdpa_prio_fp(system: LinearSystem) -> bool:
+    """GDPA optimizing only priorities, keeping the (contended) mapping."""
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
+    parameter_handler = FPHandler()
+    cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
+    stop_function = ThresholdStopFunction(limit=100)
+    gradient_function = VectorFPGradientFunction(scenarios_builder=PrioritiesMatrix())
+    update_function = NoisyAdam()
+    optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
+                                         cost_function=cost_function,
+                                         stop_function=stop_function,
+                                         gradient_function=gradient_function,
+                                         update_function=update_function,
+                                         verbose=False)
+
+    pd = PDAssignment(normalize=True)
+    pd.apply(system)
+    optimizer.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
 
@@ -118,6 +141,9 @@ if __name__ == '__main__':
                         help="utilization levels to sweep (default: 0.5..0.9, 20 levels)")
     parser.add_argument("--batch-size", type=int, default=10000,
                         help="brute-force batch size (default: 10000)")
+    parser.add_argument("--methods", nargs="+", default=None,
+                        help="subset of methods to run, e.g. --methods gdpa-prio "
+                             "(default: all)")
     parser.add_argument("--start", type=int, default=1,
                         help="first utilization level to run, 1-based (default: 1); "
                              "previous levels are loaded from the output directory")
@@ -131,10 +157,18 @@ if __name__ == '__main__':
     tools = [
         ("pd", pd_mapping_fp),
         ("hopa", hopa_mapping_fp),
+        ("gdpa-prio", gdpa_prio_fp),
         ("gdpa-100", partial(gdpa_mapping_fp, limit=100)),
         ("gdpa-200", partial(gdpa_mapping_fp, limit=200)),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
     ]
+
+    if args.methods:
+        unknown = set(args.methods) - {name for name, _ in tools}
+        if unknown:
+            parser.error(f"unknown methods {sorted(unknown)}; "
+                         f"choose from {[name for name, _ in tools]}")
+        tools = [t for t in tools if t[0] in args.methods]
 
     if not 1 <= args.start <= len(args.utilizations):
         parser.error(f"--start must be between 1 and {len(args.utilizations)}")
