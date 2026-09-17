@@ -13,9 +13,13 @@ Usage (from ``code/``):
 """
 
 import argparse
+import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+
+from examples.evaluation import SchedRatioEval
 
 NAME = "map-bf-9"
 SUFFIXES = ("schedulables", "times", "times_success")
@@ -32,12 +36,32 @@ def merge(target_file, source_files, order):
     return df[cols]
 
 
+def regenerate_diagnostics(target, labels, n_systems):
+    """Rebuild the in-directory PNGs from the merged spreadsheets."""
+    sched = pd.read_excel(target / f"{NAME}_schedulables.xlsx", index_col=0)[list(labels)]
+    succ = pd.read_excel(target / f"{NAME}_times_success.xlsx", index_col=0)[list(labels)]
+    results = sched.to_numpy(dtype=float)
+    success_sums = np.nan_to_num(succ.to_numpy(dtype=float)) * results
+
+    runner = SchedRatioEval(NAME, labels=list(labels), funcs=[None] * len(labels),
+                            systems=[None] * n_systems,
+                            utilizations=sched.index.to_numpy(), threads=1,
+                            output_dir=str(target))
+    runner.start = time.time()
+    runner._save(results, "schedulables")
+    runner._efficiency_chart(results, success_sums)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--target", required=True, help="directory with the full results")
     parser.add_argument("--source", nargs="+", required=True,
                         help="directory(ies) with partial runs to merge in")
+    parser.add_argument("--systems", type=int, default=25,
+                        help="number of systems (for the efficiency chart; default: 25)")
+    parser.add_argument("--no-diagnostics", action="store_true",
+                        help="do not regenerate the in-directory PNGs")
     args = parser.parse_args()
 
     target = Path(args.target)
@@ -49,6 +73,12 @@ def main():
         df = merge(target_file, source_files, ORDER)
         df.to_excel(target_file)
         print(f"{target_file}: {list(df.columns)}")
+
+    if not args.no_diagnostics:
+        labels = tuple(pd.read_excel(target / f"{NAME}_schedulables.xlsx",
+                                     index_col=0).columns)
+        regenerate_diagnostics(target, labels, args.systems)
+        print(f"{target}: regenerated diagnostics (schedulables, efficiency)")
 
 
 if __name__ == "__main__":
