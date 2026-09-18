@@ -253,11 +253,14 @@ def build_phase(phase):
             dict(big, restarts=5, limit=500),
             dict(big, restarts=5, seed=2),
         ]
+    if phase == "winner":
+        return [dict(BASE, lr=10.0, mapping_delta=2.0, priority_delta=2.0,
+                     restarts=5, limit=500)]
     raise SystemExit(f"unknown phase {phase!r} (use --list)")
 
 
 PHASES = ("baseline", "warmup", "lr", "sigma", "mapdelta", "noise", "limit",
-          "study", "combine", "push", "alt", "final")
+          "study", "combine", "push", "alt", "final", "winner")
 
 
 def main():
