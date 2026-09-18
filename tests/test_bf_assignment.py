@@ -6,7 +6,10 @@ import numpy as np
 
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from assignment.assignments import PDAssignment
-from assignment.bf_assignment import BruteForceFPAssignment, BruteForceFPMappingAssignment, BruteForceMappingAssignment
+from assignment.bf_assignment import (BruteForceFPAssignment,
+                                      BruteForceFPMappingAssignment,
+                                      BruteForceFPSequentialMappingAssignment,
+                                      BruteForceMappingAssignment)
 from examples.example_models import get_palencia_system, get_three_tasks, get_system
 from examples.generator import set_utilization
 from random import Random
@@ -262,6 +265,32 @@ class BruteForceMappingPruneTest(unittest.TestCase):
                         bf_full.apply(full)
                         self.assertEqual(bf_pruned.schedulable, bf_full.schedulable)
                         self.assertLessEqual(bf_pruned.evaluated, bf_full.space_size)
+
+
+class BruteForceSequentialMappingTest(unittest.TestCase):
+    """Scalar per-candidate brute force (exact reference, slow)."""
+
+    def test_space_size(self):
+        system = get_system((1, 2, 2), random=Random(42), utilization=0.5, balanced=True)
+        bf = BruteForceFPSequentialMappingAssignment()
+        bf.apply(system)
+        self.assertEqual(bf.space_size, 6)
+
+    def test_finds_solution_and_system_is_schedulable(self):
+        system = get_system((2, 2, 2), random=Random(0), utilization=0.5, balanced=True)
+        bf = BruteForceFPSequentialMappingAssignment(max_time=5)
+        bf.apply(system)
+        self.assertTrue(bf.schedulable)
+        self.assertTrue(system.is_schedulable())
+
+    def test_matches_vectorized_on_known_system(self):
+        vector_system = get_system((2, 2, 2), random=Random(0), utilization=0.5, balanced=True)
+        scalar_system = get_system((2, 2, 2), random=Random(0), utilization=0.5, balanced=True)
+        vector = BruteForceFPMappingAssignment(batch_size=100)
+        vector.apply(vector_system)
+        scalar = BruteForceFPSequentialMappingAssignment(max_time=5)
+        scalar.apply(scalar_system)
+        self.assertEqual(vector.schedulable, scalar.schedulable)
 
 
 class BruteForceMappingOnlyTest(unittest.TestCase):

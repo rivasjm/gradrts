@@ -7,6 +7,7 @@ from model.analysis_function import AnalysisFunction
 from model.linear_system import LinearSystem
 from utils.exec_time import ExecTime
 from vector.vector_fp import VectorHolisticFPAnalysis
+from analysis.holistic_fp_analysis import HolisticFPAnalysis
 
 
 class BruteForceFPAssignment(AnalysisFunction):
@@ -235,6 +236,83 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
         for task, proc_idx, prio in zip(system.tasks, mapping_tuple, priorities_tuple):
             task.processor = procs[proc_idx]
             task.priority = float(prio)
+
+
+class BruteForceFPSequentialMappingAssignment(AnalysisFunction):
+    """Brute-force mapping + priorities, one candidate at a time.
+
+    Same search space and pruning as ``BruteForceFPMappingAssignment`` but each
+    assignment is checked with the scalar ``HolisticFPAnalysis`` instead of the
+    vectorized one. It is the exact reference (no batching), so it is far slower
+    and only practical on small systems; it is useful to validate the vectorized
+    brute force.
+    """
+
+    def __init__(self, verbose=False, prune=True, max_time=None):
+        self.verbose = verbose
+        self.prune = prune
+        self.analysis = HolisticFPAnalysis(limit_factor=1, reset=True, max_time=max_time)
+        self.schedulable = False
+        self.exec_time = ExecTime()
+        self.iterations_to_sched = -1
+        self.space_size = 0
+        self.evaluated = 0
+
+    _over_utilized = staticmethod(BruteForceFPMappingAssignment._over_utilized)
+    _single_priority_matrix = staticmethod(BruteForceFPMappingAssignment._single_priority_matrix)
+    _apply_solution = staticmethod(BruteForceFPMappingAssignment._apply_solution)
+
+    def apply(self, system: LinearSystem) -> LinearSystem:
+        self.exec_time.init()
+        self.schedulable = False
+        self.iterations_to_sched = -1
+        self.evaluated = 0
+
+        tasks = system.tasks
+        n = len(tasks)
+        pi = len(system.processors)
+        utilization = np.array([t.wcet / t.period for t in tasks])
+
+        mapping_space = list(itertools.product(range(pi), repeat=n))
+        perms_per_mapping = []
+        for mapping in mapping_space:
+            proc_counts = [mapping.count(p) for p in range(pi)]
+            perms_per_mapping.append(math.prod(math.factorial(c) for c in proc_counts))
+        self.space_size = sum(perms_per_mapping)
+
+        for mapping_tuple in mapping_space:
+            if self.prune and self._over_utilized(mapping_tuple, utilization, pi):
+                continue
+
+            proc_task_indices = [[] for _ in range(pi)]
+            for task_idx, proc in enumerate(mapping_tuple):
+                proc_task_indices[proc].append(task_idx)
+
+            prio_perms = [list(itertools.permutations(range(1, len(pt) + 1)))
+                          for pt in proc_task_indices]
+
+            for prio_combo in itertools.product(*prio_perms):
+                priorities = [0] * n
+                for proc_idx, perm in enumerate(prio_combo):
+                    for task_idx, prio_val in zip(proc_task_indices[proc_idx], perm):
+                        priorities[task_idx] = prio_val
+
+                self._apply_solution(system, mapping_tuple, priorities)
+                self.analysis.apply(system)  # scalar HolisticFPAnalysis, one candidate
+                self.evaluated += 1
+
+                if system.is_schedulable():
+                    self.schedulable = True
+                    self.iterations_to_sched = self.evaluated
+                    if self.verbose:
+                        print(f"Schedulable solution found after {self.evaluated} candidates")
+                    self.exec_time.stop()
+                    return system
+
+        if self.verbose:
+            print(f"Exhausted {self.evaluated} candidates, none schedulable")
+        self.exec_time.stop()
+        return system
 
 
 class BruteForceMappingAssignment(AnalysisFunction):
