@@ -36,7 +36,7 @@ from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import Adam, NoisyAdam
 from vector.vector_fp import MappingPrioritiesMatrix, VectorFPGradientFunction
 
-import bf  # sibling module: get_systems, SIZE
+import bf  # sibling module: get_systems
 
 # Utilization levels where the gap is concentrated (0.71 .. 0.86).
 GAP_LEVELS = [0.710526, 0.731579, 0.752632, 0.773684,
@@ -319,13 +319,13 @@ def main():
     if args.utilizations is None:
         args.utilizations = list(bf.UTILIZATIONS) if args.levels == "all" else GAP_LEVELS
 
-    _init_worker(args.n, bf.SIZE)
+    _init_worker(args.n, 9)
     configs = build_phase(args.phase)
     summary = []
     print(f"phase={args.phase} | levels={args.utilizations} | n={args.n} | "
           f"configs={len(configs)}", flush=True)
 
-    with Pool(args.threads, initializer=_init_worker, initargs=(args.n, bf.SIZE)) as pool:
+    with Pool(args.threads, initializer=_init_worker, initargs=(args.n, 9)) as pool:
         for cfg in configs:
             t0 = time.perf_counter()
             total = 0

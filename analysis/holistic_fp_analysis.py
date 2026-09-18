@@ -6,11 +6,13 @@ from model.linear_system import LinearSystem
 
 
 class HolisticFPAnalysis(AnalysisFunction):
-    def __init__(self, limit_factor=10, reset=False, verbose=False, max_time=None):
+    def __init__(self, limit_factor=10, reset=False, verbose=False, max_time=None,
+                 prune_over_utilized=False):
         self.limit_factor = limit_factor
         self.reset = reset
         self.verbose = verbose
         self.max_time = max_time
+        self.prune_over_utilized = prune_over_utilized
         self._start = None
 
     def reset_wcrts(self, system: LinearSystem):
@@ -31,6 +33,18 @@ class HolisticFPAnalysis(AnalysisFunction):
     def apply(self, system: LinearSystem) -> None:
         init_wcrt(system)
         self._start = time.perf_counter()
+
+        # Shortcut mirroring VectorHolisticFPAnalysis: a processor at full
+        # utilization cannot schedule its tasks under fixed priorities, and the
+        # busy period does not close, so skip the (potentially very slow)
+        # fixed-point loop and saturate the response times.
+        if self.prune_over_utilized and any(p.utilization >= 1.0 for p in system.processors):
+            if self.reset:
+                reset_wcrt(system)
+            else:
+                for task in system.tasks:
+                    task.wcrt = (self.limit_factor + 1) * task.flow.deadline
+            return
 
         wcrts = [t.wcrt for t in system.tasks]
         wcrts_prev = [0 for t in system.tasks]

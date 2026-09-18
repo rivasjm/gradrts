@@ -41,9 +41,8 @@ from model.linear_system import LinearSystem
 from vector.vector_fp import (MappingPrioritiesMatrix, PrioritiesMatrix,
                               VectorFPGradientFunction)
 
-# flows x tasks per flow x processors -> 9 tasks
-SIZE = (3, 3, 3)
-SIZE_KEY = SIZE[0] * SIZE[1]
+# size key (total tasks) -> flows x tasks per flow x processors
+SIZES = {9: (3, 3, 3), 10: (2, 5, 3)}
 POPULATION = 25
 SEED = 42
 DEADLINE_FACTOR_MIN = 0.5
@@ -60,10 +59,12 @@ BF_SEQ_ANALYSIS_MAX_TIME = 1.0
 UTILIZATIONS = np.linspace(0.5, 0.9, 20)
 
 
-def get_systems(n=POPULATION):
+def get_systems(n=POPULATION, size=9):
     """Small unbalanced population; the initial mapping is contended."""
+    if size not in SIZES:
+        raise ValueError(f"unknown size {size!r}, use one of {sorted(SIZES)}")
     rnd = Random(SEED)
-    return [get_system(SIZE, rnd, balanced=False, name=str(i),
+    return [get_system(SIZES[size], rnd, balanced=False, name=str(i),
                        deadline_factor_min=DEADLINE_FACTOR_MIN,
                        deadline_factor_max=DEADLINE_FACTOR_MAX,
                        period_min=PERIOD_MIN, period_max=PERIOD_MAX)
@@ -135,7 +136,8 @@ class BlockDelta(AvgSeparationDelta):
 
 def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
                   mapping_delta=None, priority_delta=None, seed=1):
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
+                                  prune_over_utilized=True)
     parameter_handler = FPMappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=limit)
@@ -200,6 +202,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="GDPA vs brute force (mapping + priorities)")
     parser.add_argument("--n", type=int, default=POPULATION,
                         help=f"number of systems (default: {POPULATION})")
+    parser.add_argument("--size", type=int, choices=sorted(SIZES), default=9,
+                        help=f"total tasks (default: 9); sizes: {SIZES}")
     parser.add_argument("-u", "--utilizations", type=float, nargs="+",
                         default=list(UTILIZATIONS),
                         help="utilization levels to sweep (default: 0.5..0.9, 20 levels)")
@@ -215,8 +219,8 @@ if __name__ == '__main__':
                         help="output directory (default: script directory)")
     args = parser.parse_args()
 
-    eval_name = f"map-bf-{SIZE_KEY}"
-    systems = get_systems(args.n)
+    eval_name = f"map-bf-{args.size}"
+    systems = get_systems(args.n, args.size)
 
     tools = [
         ("pd", pd_mapping_fp),
@@ -226,8 +230,10 @@ if __name__ == '__main__':
         ("gdpa-200", partial(gdpa_ms_fp, chunk=20, restarts=10)),
         ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10)),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
-        ("bf-seq", bf_seq_mapping),
     ]
+    if args.size == 9:
+        # scalar brute force is only practical on the smallest population
+        tools.append(("bf-seq", bf_seq_mapping))
 
     if args.methods:
         unknown = set(args.methods) - {name for name, _ in tools}

@@ -1,16 +1,18 @@
 """Schedulability figure for the map-bf scenario: GDPA vs brute force.
 
-Reads ``map-bf-9/map-bf-9_schedulables.xlsx`` and writes a two-line figure plus
+Reads ``map-bf-<size>/map-bf-<size>_schedulables.xlsx`` and writes a figure plus
 the optimality gap (systems the brute force solves that GDPA does not).
+
+    python workspace/framework_paper/map-bf/charts.py --size 9
 """
 
+import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-NAME = "map-bf-9"
 
 STYLES = {
     "pd": {"color": "#8B4513", "marker": "s", "ls": ":"},
@@ -26,13 +28,18 @@ STYLES = {
 COLUMNS = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "gdpa-500", "bf", "bf-seq")
 
 
-def load():
-    path = HERE / NAME / f"{NAME}_schedulables.xlsx"
+def name(size):
+    return f"map-bf-{size}"
+
+
+def load(size):
+    n = name(size)
+    path = HERE / n / f"{n}_schedulables.xlsx"
     df = pd.read_excel(path, index_col=0)
     return df[[c for c in COLUMNS if c in df.columns]]
 
 
-def plot(df):
+def plot(df, size):
     fig, ax = plt.subplots(figsize=(6, 3.6), constrained_layout=True)
     for col in df.columns:
         style = STYLES.get(col, {})
@@ -42,32 +49,36 @@ def plot(df):
     ax.set_ylim(bottom=0)
     ax.grid(True, which="major", axis="x")
     ax.legend(loc="lower left")
-    fig.savefig(HERE / f"{NAME}_schedulables.pdf")
-    fig.savefig(HERE / f"{NAME}_schedulables.png")
+    fig.savefig(HERE / f"{name(size)}_schedulables.pdf")
+    fig.savefig(HERE / f"{name(size)}_schedulables.png")
     plt.close(fig)
 
 
-def report_gap(df):
-    print(f"=== optimality gap ({NAME}) ===")
+def report_gap(df, size):
+    print(f"=== optimality gap ({name(size)}) ===")
     for col in df.columns:
-        if col == "bf":
+        if col in ("bf", "bf-seq"):
             continue
         gap = (df["bf"] - df[col]).clip(lower=0)
         total = int(df["bf"].sum())
         solved = int(df[col].sum())
         print(f"{col:9s}: {solved}/{total} schedulable, gap vs bf = {int(gap.sum())} "
               f"(max/level {int(gap.max())})")
-    over = (df[[c for c in df.columns if c != 'bf']].max(axis=1) > df['bf'])
+    over = (df[[c for c in df.columns if c not in ("bf", "bf-seq")]].max(axis=1) > df["bf"])
     if over.any():
-        print("WARNING: GDPA exceeded bf at levels:",
-              list(df.index[over]))
+        print("WARNING: GDPA exceeded bf at levels:", list(df.index[over]))
 
 
-def main():
-    df = load()
-    plot(df)
-    report_gap(df)
+def main(size):
+    df = load(size)
+    plot(df, size)
+    report_gap(df, size)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--size", type=int, default=9, choices=(9, 10),
+                        help="total tasks / scenario size (default: 9)")
+    args = parser.parse_args()
+    main(args.size)
