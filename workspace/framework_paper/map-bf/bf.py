@@ -25,7 +25,8 @@ import numpy as np
 
 from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from assignment.assignments import PDAssignment
-from assignment.bf_assignment import BruteForceFPMappingAssignment
+from assignment.bf_assignment import (BruteForceFPMappingAssignment,
+                                      BruteForceFPSequentialMappingAssignment)
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
@@ -52,6 +53,9 @@ PERIOD_MAX = 1000
 # HOPA runs up to 160 scalar analyses; some systems make a single analysis
 # converge pathologically slowly, so each call is capped (baseline only).
 SCALAR_ANALYSIS_MAX_TIME = 0.5
+# bf-seq is the scalar brute force: cap each candidate's analysis for the same
+# reason (it is a slow reference method).
+BF_SEQ_ANALYSIS_MAX_TIME = 1.0
 # utilizations between 50 % and 90 %
 UTILIZATIONS = np.linspace(0.5, 0.9, 20)
 
@@ -184,6 +188,14 @@ def bf_mapping(system: LinearSystem, batch_size: int) -> bool:
     return system.is_schedulable()
 
 
+def bf_seq_mapping(system: LinearSystem, max_time: float = BF_SEQ_ANALYSIS_MAX_TIME) -> bool:
+    """Brute force evaluating every candidate with the scalar analysis (slow)."""
+    bf = BruteForceFPSequentialMappingAssignment(prune=True, max_time=max_time)
+    bf.apply(system)
+    HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
+    return system.is_schedulable()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="GDPA vs brute force (mapping + priorities)")
     parser.add_argument("--n", type=int, default=POPULATION,
@@ -214,6 +226,7 @@ if __name__ == '__main__':
         ("gdpa-200", partial(gdpa_ms_fp, chunk=20, restarts=10)),
         ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10)),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
+        ("bf-seq", bf_seq_mapping),
     ]
 
     if args.methods:

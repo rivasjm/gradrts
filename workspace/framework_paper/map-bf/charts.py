@@ -20,9 +20,10 @@ STYLES = {
     "gdpa-200": {"color": "#FF8C00", "marker": "v", "ls": "-"},
     "gdpa-500": {"color": "#000000", "marker": "P", "ls": "-"},
     "bf": {"color": "#FF0000", "marker": "*", "ls": "--"},
+    "bf-seq": {"color": "#E377C2", "marker": ".", "ls": ":"},
 }
 
-COLUMNS = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "gdpa-500", "bf")
+COLUMNS = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "gdpa-500", "bf", "bf-seq")
 
 
 def load():
