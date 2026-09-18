@@ -242,11 +242,22 @@ def build_phase(phase):
             dict(best, margin=(0.95, 0.05)),
             dict(BASE, margin=(0.8, 0.2)),
         ]
+    if phase == "final":
+        big = dict(BASE, lr=10.0, mapping_delta=2.0, priority_delta=2.0)
+        mid = dict(BASE, lr=10.0, mapping_delta=1.0, priority_delta=1.0)
+        return [
+            dict(mid, restarts=3),
+            dict(mid, restarts=5),
+            dict(big, restarts=3),
+            dict(big, restarts=5),
+            dict(big, restarts=5, limit=500),
+            dict(big, restarts=5, seed=2),
+        ]
     raise SystemExit(f"unknown phase {phase!r} (use --list)")
 
 
 PHASES = ("baseline", "warmup", "lr", "sigma", "mapdelta", "noise", "limit",
-          "study", "combine", "push", "alt")
+          "study", "combine", "push", "alt", "final")
 
 
 def main():
@@ -254,7 +265,9 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--phase", default="study", help="phase to run (default: study)")
     parser.add_argument("-u", "--utilizations", type=float, nargs="+",
-                        default=GAP_LEVELS, help="utilization levels (default: gap levels)")
+                        default=None, help="utilization levels (default: gap levels)")
+    parser.add_argument("--levels", choices=("gap", "all"), default="gap",
+                        help="'gap' levels (default) or all 20 levels")
     parser.add_argument("--n", type=int, default=25, help="number of systems")
     parser.add_argument("--threads", type=int, default=6, help="worker processes")
     parser.add_argument("--list", action="store_true", help="list phases and exit")
@@ -263,6 +276,9 @@ def main():
     if args.list:
         print("phases:", ", ".join(PHASES))
         return
+
+    if args.utilizations is None:
+        args.utilizations = list(bf.UTILIZATIONS) if args.levels == "all" else GAP_LEVELS
 
     _init_worker(args.n, bf.SIZE)
     configs = build_phase(args.phase)
