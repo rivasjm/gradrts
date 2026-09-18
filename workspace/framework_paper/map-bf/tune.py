@@ -283,11 +283,20 @@ def build_phase(phase):
             dict(big, restarts=20, chunk=25, warmup=0),       # budget <=500, short chunks
             dict(big, restarts=10, chunk=20, warmup=0),       # budget <=200, short chunks
         ]
+    if phase == "scale":
+        big = dict(BASE, lr=10.0, mapping_delta=2.0, priority_delta=2.0, warmup=0)
+        return [
+            dict(big, chunk=25, restarts=4),    # gdpa-100 candidate
+            dict(big, chunk=20, restarts=5),    # gdpa-100, alt
+            dict(big, chunk=10, restarts=10),   # gdpa-100, alt
+            dict(big, chunk=50, restarts=2),    # gdpa-100, alt
+            dict(big, chunk=20, restarts=25),   # gdpa-500, uniform chunk
+        ]
     raise SystemExit(f"unknown phase {phase!r} (use --list)")
 
 
 PHASES = ("baseline", "warmup", "lr", "sigma", "mapdelta", "noise", "limit",
-          "study", "combine", "push", "alt", "final", "winner", "budget")
+          "study", "combine", "push", "alt", "final", "winner", "budget", "scale")
 
 
 def main():
