@@ -96,7 +96,7 @@ def make_handler(cfg):
     return MarginMappingHandler(current=margin[0], other=margin[1])
 
 
-def _gdpa_once(system, cfg):
+def _gdpa_once(system, cfg, callback=None):
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     handler = make_handler(cfg)
     cost = InvslackCost(parameter_handler=handler, analysis=analysis)
@@ -120,7 +120,8 @@ def _gdpa_once(system, cfg):
                                          cost_function=cost,
                                          stop_function=stop,
                                          gradient_function=gradient,
-                                         update_function=update, verbose=False)
+                                         update_function=update, callback=callback,
+                                         verbose=False)
     PDAssignment(normalize=True).apply(system)
     optimizer.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
@@ -128,19 +129,35 @@ def _gdpa_once(system, cfg):
 
 
 def gdpa_run(system, cfg):
-    """Run GDPA; with ``restarts`` > 1, retry with different seeds until one
-    finds a schedulable solution (multi-start on the same initial mapping)."""
+    """Run GDPA with periodic restarts.
+
+    ``chunk`` is the iteration budget of each restart and ``restarts`` how many
+    are tried (each with a different noise seed); the total is bounded by
+    ``restarts * chunk``. Returns (schedulable, first_success_iteration)."""
     restarts = cfg.get("restarts", 1)
+    chunk = cfg.get("chunk", cfg.get("limit", 200))
     for r in range(restarts):
         candidate = copy.deepcopy(system)
-        if _gdpa_once(candidate, dict(cfg, seed=cfg.get("seed", 1) + r)):
-            return True
-    return False
+        first = {"iter": None}
+
+        def callback(t, S, x, xb, cost, best, ref_cost, _first=first):
+            if _first["iter"] is None and cost < 0:
+                _first["iter"] = t
+
+        if _gdpa_once(candidate, dict(cfg, limit=chunk, seed=cfg.get("seed", 1) + r),
+                      callback=callback):
+            return True, first["iter"]
+    return False, None
 
 
 def label(cfg):
-    parts = [f"lim={cfg.get('limit', 200)}", f"wu={cfg.get('warmup', 30)}",
-             f"lr={cfg.get('lr', 3.0)}"]
+    if cfg.get("chunk") is not None:
+        head = [f"chunk={cfg['chunk']}", f"restarts={cfg.get('restarts', 1)}"]
+    else:
+        head = [f"lim={cfg.get('limit', 200)}"]
+        if cfg.get("restarts", 1) > 1:
+            head.append(f"restarts={cfg['restarts']}")
+    parts = head + [f"wu={cfg.get('warmup', 30)}", f"lr={cfg.get('lr', 3.0)}"]
     parts.append("noise" if cfg.get("noise", True) else "adam")
     if cfg.get("noise", True):
         parts.append(f"g={cfg.get('gamma', 0.9)}")
@@ -152,8 +169,6 @@ def label(cfg):
         parts.append(f"pdelta={cfg['priority_delta']}")
     if cfg.get("seed", 1) != 1:
         parts.append(f"seed={cfg['seed']}")
-    if cfg.get("restarts", 1) > 1:
-        parts.append(f"restarts={cfg['restarts']}")
     if cfg.get("margin") is not None:
         parts.append(f"margin={cfg['margin']}")
     return ",".join(parts)
@@ -169,8 +184,8 @@ def _worker(args):
     system = copy.deepcopy(_BASE_SYSTEMS[idx])
     set_system_utilization(system, u)
     t0 = time.perf_counter()
-    ok = gdpa_run(system, cfg)
-    return ok, time.perf_counter() - t0
+    ok, first = gdpa_run(system, cfg)
+    return ok, time.perf_counter() - t0, first
 
 
 def build_phase(phase):
@@ -256,11 +271,23 @@ def build_phase(phase):
     if phase == "winner":
         return [dict(BASE, lr=10.0, mapping_delta=2.0, priority_delta=2.0,
                      restarts=5, limit=500)]
+    if phase == "budget":
+        big = dict(BASE, lr=10.0, mapping_delta=2.0, priority_delta=2.0)
+        return [
+            dict(BASE, restarts=1, limit=200),                # baseline gdpa-200
+            dict(big, limit=500, restarts=5),                 # current winner (<=2500)
+            dict(big, restarts=4, chunk=50),                  # budget <=200
+            dict(big, restarts=5, chunk=100),                 # budget <=500
+            dict(big, restarts=10, chunk=50),                 # budget <=500
+            dict(big, restarts=10, chunk=50, warmup=0),       # budget <=500, no warmup
+            dict(big, restarts=20, chunk=25, warmup=0),       # budget <=500, short chunks
+            dict(big, restarts=10, chunk=20, warmup=0),       # budget <=200, short chunks
+        ]
     raise SystemExit(f"unknown phase {phase!r} (use --list)")
 
 
 PHASES = ("baseline", "warmup", "lr", "sigma", "mapdelta", "noise", "limit",
-          "study", "combine", "push", "alt", "final", "winner")
+          "study", "combine", "push", "alt", "final", "winner", "budget")
 
 
 def main():
@@ -294,15 +321,18 @@ def main():
             t0 = time.perf_counter()
             total = 0
             worst = 0
+            firsts = []
             for u in args.utilizations:
                 results = pool.map(_worker, [(i, u, cfg) for i in range(args.n)])
-                total += sum(int(ok) for ok, _ in results)
-                worst = max(worst, max(dt for _, dt in results))
+                total += sum(int(ok) for ok, _, _ in results)
+                worst = max(worst, max(dt for _, dt, _ in results))
+                firsts += [f for ok, _, f in results if ok and f is not None]
             dt = time.perf_counter() - t0
             lab = label(cfg)
             denom = args.n * len(args.utilizations)
-            print(f"  {lab:55s} {total}/{denom} ({dt:.0f}s, worst_run={worst:.0f}s)",
-                  flush=True)
+            avg_first = sum(firsts) / len(firsts) if firsts else float("nan")
+            print(f"  {lab:55s} {total}/{denom} ({dt:.0f}s, worst_run={worst:.0f}s, "
+                  f"avg_first_iter={avg_first:.0f})", flush=True)
             summary.append((lab, total, denom))
 
     print("\n=== SUMMARY ===")
