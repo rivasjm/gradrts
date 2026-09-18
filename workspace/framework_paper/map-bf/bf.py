@@ -86,14 +86,15 @@ def hopa_mapping_fp(system: LinearSystem) -> bool:
     return system.is_schedulable()
 
 
-def gdpa_prio_fp(system: LinearSystem) -> bool:
+def gdpa_prio_fp(system: LinearSystem, prune_over_utilized: bool = False) -> bool:
     """GDPA optimizing only priorities, keeping the (contended) mapping.
 
     Since the mapping cannot move, over-loaded processors keep the scalar
     analysis near its pathological regime, so each call is capped like HOPA's.
     """
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
-                                  max_time=SCALAR_ANALYSIS_MAX_TIME)
+                                  max_time=SCALAR_ANALYSIS_MAX_TIME,
+                                  prune_over_utilized=prune_over_utilized)
     parameter_handler = FPHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
@@ -135,9 +136,10 @@ class BlockDelta(AvgSeparationDelta):
 
 
 def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
-                  mapping_delta=None, priority_delta=None, seed=1):
+                  mapping_delta=None, priority_delta=None, seed=1,
+                  prune_over_utilized=False):
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
-                                  prune_over_utilized=True)
+                                  prune_over_utilized=prune_over_utilized)
     parameter_handler = FPMappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=limit)
@@ -166,7 +168,8 @@ def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
     return system.is_schedulable()
 
 
-def gdpa_ms_fp(system: LinearSystem, chunk: int, restarts: int) -> bool:
+def gdpa_ms_fp(system: LinearSystem, chunk: int, restarts: int,
+               prune_over_utilized: bool = False) -> bool:
     """Bounded multi-start GDPA (selected by the map-bf tuning study).
 
     The optimizer uses large per-block finite-difference steps and learning
@@ -175,7 +178,8 @@ def gdpa_ms_fp(system: LinearSystem, chunk: int, restarts: int) -> bool:
     ``chunk`` iterations, so the total is bounded by ``chunk * restarts`` (the
     number in the method name).
     """
-    steps = dict(lr=10.0, warmup=0, mapping_delta=2.0, priority_delta=2.0)
+    steps = dict(lr=10.0, warmup=0, mapping_delta=2.0, priority_delta=2.0,
+                 prune_over_utilized=prune_over_utilized)
     for restart in range(restarts):
         candidate = deepcopy(system)
         if _gdpa_mapping(candidate, limit=chunk, seed=1 + restart, **steps):
@@ -221,14 +225,16 @@ if __name__ == '__main__':
 
     eval_name = f"map-bf-{args.size}"
     systems = get_systems(args.n, args.size)
+    # the over-utilization shortcut is enabled for size 10 only
+    prune = args.size == 10
 
     tools = [
         ("pd", pd_mapping_fp),
         ("hopa", hopa_mapping_fp),
-        ("gdpa-prio", gdpa_prio_fp),
-        ("gdpa-100", partial(gdpa_ms_fp, chunk=25, restarts=4)),
-        ("gdpa-200", partial(gdpa_ms_fp, chunk=20, restarts=10)),
-        ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10)),
+        ("gdpa-prio", partial(gdpa_prio_fp, prune_over_utilized=prune)),
+        ("gdpa-100", partial(gdpa_ms_fp, chunk=25, restarts=4, prune_over_utilized=prune)),
+        ("gdpa-200", partial(gdpa_ms_fp, chunk=20, restarts=10, prune_over_utilized=prune)),
+        ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10, prune_over_utilized=prune)),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
     ]
     if args.size == 9:
