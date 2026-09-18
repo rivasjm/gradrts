@@ -17,6 +17,7 @@ Output goes to ``map-bf/map-bf-9/``.
 
 import argparse
 import os
+from copy import deepcopy
 from functools import partial
 from random import Random
 
@@ -30,6 +31,7 @@ from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
 from examples.generator import set_system_utilization
 from gradient_descent.cost_functions import InvslackCost
+from gradient_descent.gradient_function import AvgSeparationDelta
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import FPHandler, FPMappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
@@ -106,15 +108,43 @@ def gdpa_prio_fp(system: LinearSystem) -> bool:
     return system.is_schedulable()
 
 
-def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
+class BlockDelta(AvgSeparationDelta):
+    """Shared AvgSeparationDelta with independent finite-difference steps for
+    the mapping block and the priority block (``None`` keeps the shared one)."""
+
+    def __init__(self, sigma, mapping_prefix, mapping_delta=None, priority_delta=None):
+        super().__init__(sigma=sigma)
+        self.mapping_prefix = mapping_prefix
+        self.mapping_delta = mapping_delta
+        self.priority_delta = priority_delta
+
+    def apply(self, system, x):
+        base = super().apply(system, x)
+        out = []
+        for i in range(len(x)):
+            if i < self.mapping_prefix:
+                out.append(base[i] if self.mapping_delta is None else self.mapping_delta)
+            else:
+                out.append(base[i] if self.priority_delta is None else self.priority_delta)
+        return out
+
+
+def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
+                  mapping_delta=None, priority_delta=None, seed=1):
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     parameter_handler = FPMappingHandler()
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=limit)
-    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix())
-
+    gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
+                                                 sigma=sigma)
+    if mapping_delta is not None or priority_delta is not None:
+        p = len(system.processors)
+        t = len(system.tasks)
+        gradient_function.delta_function = BlockDelta(
+            sigma, p * t, mapping_delta=mapping_delta, priority_delta=priority_delta)
     update_function = NoisyAdam(
-        warmup_iterations=30,
+        lr=lr, seed=seed,
+        warmup_iterations=warmup,
         warmup_mask=parameter_handler.mapping_mask(system))
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                          cost_function=cost_function,
@@ -128,6 +158,25 @@ def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
     optimizer.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
+
+
+def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
+    return _gdpa_mapping(system, limit=limit)
+
+
+def gdpa_ms_fp(system: LinearSystem) -> bool:
+    """Multi-start GDPA selected by the map-bf tuning study.
+
+    Large per-block finite-difference steps and a larger learning rate fix the
+    mapping exploration; several restarts (different noise seeds) escape the
+    local minima that remained, and the longer budget lets each restart settle.
+    """
+    cfg = dict(limit=500, lr=10.0, mapping_delta=2.0, priority_delta=2.0)
+    for restart in range(5):
+        candidate = deepcopy(system)
+        if _gdpa_mapping(candidate, seed=1 + restart, **cfg):
+            return True
+    return False
 
 
 def bf_mapping(system: LinearSystem, batch_size: int) -> bool:
@@ -165,6 +214,7 @@ if __name__ == '__main__':
         ("gdpa-prio", gdpa_prio_fp),
         ("gdpa-100", partial(gdpa_mapping_fp, limit=100)),
         ("gdpa-200", partial(gdpa_mapping_fp, limit=200)),
+        ("gdpa-ms", gdpa_ms_fp),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
     ]
 

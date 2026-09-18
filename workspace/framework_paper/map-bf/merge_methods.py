@@ -23,7 +23,7 @@ from examples.evaluation import SchedRatioEval
 
 NAME = "map-bf-9"
 SUFFIXES = ("schedulables", "times", "times_success")
-ORDER = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "bf")
+ORDER = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "gdpa-ms", "bf")
 
 
 def merge(target_file, source_files, order):
