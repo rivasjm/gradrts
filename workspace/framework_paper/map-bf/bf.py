@@ -160,21 +160,19 @@ def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
     return system.is_schedulable()
 
 
-def gdpa_mapping_fp(system: LinearSystem, limit: int) -> bool:
-    return _gdpa_mapping(system, limit=limit)
+def gdpa_ms_fp(system: LinearSystem, chunk: int, restarts: int) -> bool:
+    """Bounded multi-start GDPA (selected by the map-bf tuning study).
 
-
-def gdpa_ms_fp(system: LinearSystem) -> bool:
-    """Multi-start GDPA selected by the map-bf tuning study.
-
-    Large per-block finite-difference steps and a larger learning rate fix the
-    mapping exploration; several restarts (different noise seeds) escape the
-    local minima that remained, and the longer budget lets each restart settle.
+    The optimizer uses large per-block finite-difference steps and learning
+    rate, which fixes the mapping exploration; ``restarts`` attempts with
+    different noise seeds escape the remaining local minima. Each attempt gets
+    ``chunk`` iterations, so the total is bounded by ``chunk * restarts`` (the
+    number in the method name).
     """
-    cfg = dict(limit=500, lr=10.0, mapping_delta=2.0, priority_delta=2.0)
-    for restart in range(5):
+    steps = dict(lr=10.0, warmup=0, mapping_delta=2.0, priority_delta=2.0)
+    for restart in range(restarts):
         candidate = deepcopy(system)
-        if _gdpa_mapping(candidate, seed=1 + restart, **cfg):
+        if _gdpa_mapping(candidate, limit=chunk, seed=1 + restart, **steps):
             return True
     return False
 
@@ -212,9 +210,9 @@ if __name__ == '__main__':
         ("pd", pd_mapping_fp),
         ("hopa", hopa_mapping_fp),
         ("gdpa-prio", gdpa_prio_fp),
-        ("gdpa-100", partial(gdpa_mapping_fp, limit=100)),
-        ("gdpa-200", partial(gdpa_mapping_fp, limit=200)),
-        ("gdpa-ms", gdpa_ms_fp),
+        ("gdpa-100", partial(gdpa_ms_fp, chunk=25, restarts=4)),
+        ("gdpa-200", partial(gdpa_ms_fp, chunk=20, restarts=10)),
+        ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10)),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
     ]
 

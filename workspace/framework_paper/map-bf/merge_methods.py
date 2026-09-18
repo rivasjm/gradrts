@@ -23,16 +23,20 @@ from examples.evaluation import SchedRatioEval
 
 NAME = "map-bf-9"
 SUFFIXES = ("schedulables", "times", "times_success")
-ORDER = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "gdpa-ms", "bf")
+ORDER = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "gdpa-500", "bf")
 
 
 def merge(target_file, source_files, order):
-    frames = [pd.read_excel(target_file, index_col=0)]
-    frames += [pd.read_excel(f, index_col=0) for f in source_files if Path(f).exists()]
-    df = pd.concat(frames, axis=1)
+    sources = [pd.read_excel(f, index_col=0) for f in source_files if Path(f).exists()]
+    source_cols = set()
+    for frame in sources:
+        source_cols |= set(frame.columns)
+    target = pd.read_excel(target_file, index_col=0)
+    # a column provided by a source run replaces the one in the target
+    target = target[[c for c in target.columns if c not in source_cols]]
+    df = pd.concat([target] + sources, axis=1)
     df = df.loc[:, ~df.columns.duplicated()]
     cols = [c for c in order if c in df.columns]
-    cols += [c for c in df.columns if c not in order]
     return df[cols]
 
 
