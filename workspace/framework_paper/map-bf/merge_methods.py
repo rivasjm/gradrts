@@ -63,6 +63,7 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--size", type=int, default=9, choices=(9, 10, 12),
                         help="scenario size (default: 9)")
+    parser.add_argument("--balanced", action="store_true", help="balanced variant")
     parser.add_argument("--target", required=True, help="directory with the full results")
     parser.add_argument("--source", nargs="+", required=True,
                         help="directory(ies) with partial runs to merge in")
@@ -72,7 +73,7 @@ def main():
                         help="do not regenerate the in-directory PNGs")
     args = parser.parse_args()
 
-    name = f"map-bf-{args.size}"
+    name = f"map-bf-{args.size}" + ("-balanced" if args.balanced else "")
     target = Path(args.target)
     for suffix in SUFFIXES:
         target_file = target / f"{name}_{suffix}.xlsx"

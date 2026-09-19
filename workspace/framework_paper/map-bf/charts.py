@@ -1,9 +1,9 @@
 """Schedulability figure for the map-bf scenario: GDPA vs brute force.
 
-Reads ``map-bf-<size>/map-bf-<size>_schedulables.xlsx`` and writes a figure plus
-the optimality gap (systems the brute force solves that GDPA does not).
+Reads ``map-bf-<size>[-balanced]/map-bf-<size>[-balanced]_schedulables.xlsx`` and
+writes a figure plus the optimality gap.
 
-    python workspace/framework_paper/map-bf/charts.py --size 9
+    python workspace/framework_paper/map-bf/charts.py --size 9 [--balanced]
 """
 
 import argparse
@@ -28,18 +28,18 @@ STYLES = {
 COLUMNS = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "gdpa-500", "bf", "bf-seq")
 
 
-def name(size):
-    return f"map-bf-{size}"
+def name(size, balanced=False):
+    return f"map-bf-{size}" + ("-balanced" if balanced else "")
 
 
-def load(size):
-    n = name(size)
+def load(size, balanced=False):
+    n = name(size, balanced)
     path = HERE / n / f"{n}_schedulables.xlsx"
     df = pd.read_excel(path, index_col=0)
     return df[[c for c in COLUMNS if c in df.columns]]
 
 
-def plot(df, size):
+def plot(df, size, balanced=False):
     fig, ax = plt.subplots(figsize=(6, 3.6), constrained_layout=True)
     for col in df.columns:
         style = STYLES.get(col, {})
@@ -49,13 +49,13 @@ def plot(df, size):
     ax.set_ylim(bottom=0)
     ax.grid(True, which="major", axis="x")
     ax.legend(loc="lower left")
-    fig.savefig(HERE / f"{name(size)}_schedulables.pdf")
-    fig.savefig(HERE / f"{name(size)}_schedulables.png")
+    fig.savefig(HERE / f"{name(size, balanced)}_schedulables.pdf")
+    fig.savefig(HERE / f"{name(size, balanced)}_schedulables.png")
     plt.close(fig)
 
 
-def report_gap(df, size):
-    print(f"=== optimality gap ({name(size)}) ===")
+def report_gap(df, size, balanced=False):
+    print(f"=== optimality gap ({name(size, balanced)}) ===")
     for col in df.columns:
         if col in ("bf", "bf-seq"):
             continue
@@ -69,10 +69,10 @@ def report_gap(df, size):
         print("WARNING: GDPA exceeded bf at levels:", list(df.index[over]))
 
 
-def main(size):
-    df = load(size)
-    plot(df, size)
-    report_gap(df, size)
+def main(size, balanced=False):
+    df = load(size, balanced)
+    plot(df, size, balanced)
+    report_gap(df, size, balanced)
 
 
 if __name__ == "__main__":
@@ -80,5 +80,6 @@ if __name__ == "__main__":
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--size", type=int, default=9, choices=(9, 10, 12),
                         help="total tasks / scenario size (default: 9)")
+    parser.add_argument("--balanced", action="store_true", help="balanced variant")
     args = parser.parse_args()
-    main(args.size)
+    main(args.size, args.balanced)

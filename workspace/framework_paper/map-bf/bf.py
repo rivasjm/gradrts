@@ -30,7 +30,7 @@ from assignment.bf_assignment import (BruteForceFPMappingAssignment,
 from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.example_models import get_system
-from examples.generator import set_system_utilization
+from examples.generator import set_system_utilization, set_utilization
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import AvgSeparationDelta
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
@@ -59,12 +59,13 @@ BF_SEQ_ANALYSIS_MAX_TIME = 1.0
 UTILIZATIONS = np.linspace(0.5, 0.9, 20)
 
 
-def get_systems(n=POPULATION, size=9):
-    """Small unbalanced population; the initial mapping is contended."""
+def get_systems(n=POPULATION, size=9, balanced=False):
+    """Population; the balanced variant assigns tasks evenly (assign_balanced),
+    the unbalanced one starts from a contended mapping."""
     if size not in SIZES:
         raise ValueError(f"unknown size {size!r}, use one of {sorted(SIZES)}")
     rnd = Random(SEED)
-    return [get_system(SIZES[size], rnd, balanced=False, name=str(i),
+    return [get_system(SIZES[size], rnd, balanced=balanced, name=str(i),
                        deadline_factor_min=DEADLINE_FACTOR_MIN,
                        deadline_factor_max=DEADLINE_FACTOR_MAX,
                        period_min=PERIOD_MIN, period_max=PERIOD_MAX)
@@ -199,8 +200,8 @@ def gdpa_ms_fp(system: LinearSystem, chunk: int, restarts: int,
     return False
 
 
-def bf_mapping(system: LinearSystem, batch_size: int) -> bool:
-    bf = BruteForceFPMappingAssignment(batch_size=batch_size, prune=True)
+def bf_mapping(system: LinearSystem, batch_size: int, prune: bool = True) -> bool:
+    bf = BruteForceFPMappingAssignment(batch_size=batch_size, prune=prune)
     bf.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
@@ -220,11 +221,16 @@ if __name__ == '__main__':
                         help=f"number of systems (default: {POPULATION})")
     parser.add_argument("--size", type=int, choices=sorted(SIZES), default=9,
                         help=f"total tasks (default: 9); sizes: {SIZES}")
+    parser.add_argument("--balanced", action="store_true",
+                        help="balanced population with set_utilization (default: "
+                             "unbalanced contended mapping with set_system_utilization)")
     parser.add_argument("-u", "--utilizations", type=float, nargs="+",
                         default=list(UTILIZATIONS),
                         help="utilization levels to sweep (default: 0.5..0.9, 20 levels)")
     parser.add_argument("--batch-size", type=int, default=10000,
                         help="brute-force batch size (default: 10000)")
+    parser.add_argument("--no-bf-prune", action="store_true",
+                        help="disable the over-utilization prune in bf (pure enumeration)")
     parser.add_argument("--methods", nargs="+", default=None,
                         help="subset of methods to run, e.g. --methods gdpa-prio "
                              "(default: all)")
@@ -238,10 +244,11 @@ if __name__ == '__main__':
                         help="output directory (default: script directory)")
     args = parser.parse_args()
 
-    eval_name = f"map-bf-{args.size}"
-    systems = get_systems(args.n, args.size)
+    eval_name = f"map-bf-{args.size}" + ("-balanced" if args.balanced else "")
+    systems = get_systems(args.n, args.size, args.balanced)
     # the over-utilization shortcut is enabled for size 10 only
     prune = args.size == 10
+    utilization_func = set_utilization if args.balanced else set_system_utilization
 
     all_tools = [
         ("pd", pd_mapping_fp),
@@ -254,7 +261,8 @@ if __name__ == '__main__':
                              vector_cost=args.vector_cost)),
         ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10, prune_over_utilized=prune,
                              vector_cost=args.vector_cost)),
-        ("bf", partial(bf_mapping, batch_size=args.batch_size)),
+        ("bf", partial(bf_mapping, batch_size=args.batch_size,
+                       prune=not args.no_bf_prune)),
         ("bf-seq", bf_seq_mapping),
     ]
 
@@ -276,6 +284,6 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
     runner = SchedRatioEval(eval_name, labels=labels, funcs=funcs,
                             systems=systems, utilizations=np.array(args.utilizations),
-                            threads=6, utilization_func=set_system_utilization,
+                            threads=6, utilization_func=utilization_func,
                             output_dir=output_dir)
     runner.run(start_index=args.start - 1)
