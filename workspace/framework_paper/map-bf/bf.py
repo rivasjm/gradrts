@@ -39,7 +39,7 @@ from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
 from vector.vector_fp import (MappingPrioritiesMatrix, PrioritiesMatrix,
-                              VectorFPGradientFunction)
+                              VectorFPGradientFunction, VectorHolisticFPAnalysis)
 
 # size key (total tasks) -> flows x tasks per flow x processors
 SIZES = {9: (3, 3, 3), 10: (2, 5, 3)}
@@ -86,19 +86,25 @@ def hopa_mapping_fp(system: LinearSystem) -> bool:
     return system.is_schedulable()
 
 
-def gdpa_prio_fp(system: LinearSystem, prune_over_utilized: bool = False) -> bool:
+def gdpa_prio_fp(system: LinearSystem, prune_over_utilized: bool = False,
+                 vector_cost: bool = False) -> bool:
     """GDPA optimizing only priorities, keeping the (contended) mapping.
 
     Since the mapping cannot move, over-loaded processors keep the scalar
     analysis near its pathological regime, so each call is capped like HOPA's.
     """
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
-                                  max_time=SCALAR_ANALYSIS_MAX_TIME,
-                                  prune_over_utilized=prune_over_utilized)
     parameter_handler = FPHandler()
+    if vector_cost:
+        gradient_function = VectorFPGradientFunction(scenarios_builder=PrioritiesMatrix())
+        analysis = VectorHolisticFPAnalysis(limit_factor=10,
+                                            cache=gradient_function.cache)
+    else:
+        gradient_function = VectorFPGradientFunction(scenarios_builder=PrioritiesMatrix())
+        analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
+                                      max_time=SCALAR_ANALYSIS_MAX_TIME,
+                                      prune_over_utilized=prune_over_utilized)
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=100)
-    gradient_function = VectorFPGradientFunction(scenarios_builder=PrioritiesMatrix())
     update_function = NoisyAdam()
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                          cost_function=cost_function,
@@ -137,12 +143,8 @@ class BlockDelta(AvgSeparationDelta):
 
 def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
                   mapping_delta=None, priority_delta=None, seed=1,
-                  prune_over_utilized=False):
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
-                                  prune_over_utilized=prune_over_utilized)
+                  prune_over_utilized=False, vector_cost=False):
     parameter_handler = FPMappingHandler()
-    cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
-    stop_function = ThresholdStopFunction(limit=limit)
     gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
                                                  sigma=sigma)
     if mapping_delta is not None or priority_delta is not None:
@@ -150,6 +152,15 @@ def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
         t = len(system.tasks)
         gradient_function.delta_function = BlockDelta(
             sigma, p * t, mapping_delta=mapping_delta, priority_delta=priority_delta)
+    if vector_cost:
+        # reuse the gradient's cache and over-utilization shortcut for the cost
+        analysis = VectorHolisticFPAnalysis(limit_factor=10,
+                                            cache=gradient_function.cache)
+    else:
+        analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
+                                      prune_over_utilized=prune_over_utilized)
+    cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
+    stop_function = ThresholdStopFunction(limit=limit)
     update_function = NoisyAdam(
         lr=lr, seed=seed,
         warmup_iterations=warmup,
@@ -169,7 +180,8 @@ def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
 
 
 def gdpa_ms_fp(system: LinearSystem, chunk: int, restarts: int,
-               prune_over_utilized: bool = False) -> bool:
+               prune_over_utilized: bool = False,
+               vector_cost: bool = False) -> bool:
     """Bounded multi-start GDPA (selected by the map-bf tuning study).
 
     The optimizer uses large per-block finite-difference steps and learning
@@ -179,7 +191,7 @@ def gdpa_ms_fp(system: LinearSystem, chunk: int, restarts: int,
     number in the method name).
     """
     steps = dict(lr=10.0, warmup=0, mapping_delta=2.0, priority_delta=2.0,
-                 prune_over_utilized=prune_over_utilized)
+                 prune_over_utilized=prune_over_utilized, vector_cost=vector_cost)
     for restart in range(restarts):
         candidate = deepcopy(system)
         if _gdpa_mapping(candidate, limit=chunk, seed=1 + restart, **steps):
@@ -216,6 +228,9 @@ if __name__ == '__main__':
     parser.add_argument("--methods", nargs="+", default=None,
                         help="subset of methods to run, e.g. --methods gdpa-prio "
                              "(default: all)")
+    parser.add_argument("--vector-cost", action="store_true",
+                        help="use the vectorized analysis (and its cache) for the "
+                             "GDPA cost too, instead of the scalar one")
     parser.add_argument("--start", type=int, default=1,
                         help="first utilization level to run, 1-based (default: 1); "
                              "previous levels are loaded from the output directory")
@@ -231,10 +246,14 @@ if __name__ == '__main__':
     tools = [
         ("pd", pd_mapping_fp),
         ("hopa", hopa_mapping_fp),
-        ("gdpa-prio", partial(gdpa_prio_fp, prune_over_utilized=prune)),
-        ("gdpa-100", partial(gdpa_ms_fp, chunk=25, restarts=4, prune_over_utilized=prune)),
-        ("gdpa-200", partial(gdpa_ms_fp, chunk=20, restarts=10, prune_over_utilized=prune)),
-        ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10, prune_over_utilized=prune)),
+        ("gdpa-prio", partial(gdpa_prio_fp, prune_over_utilized=prune,
+                              vector_cost=args.vector_cost)),
+        ("gdpa-100", partial(gdpa_ms_fp, chunk=25, restarts=4, prune_over_utilized=prune,
+                             vector_cost=args.vector_cost)),
+        ("gdpa-200", partial(gdpa_ms_fp, chunk=20, restarts=10, prune_over_utilized=prune,
+                             vector_cost=args.vector_cost)),
+        ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10, prune_over_utilized=prune,
+                             vector_cost=args.vector_cost)),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
     ]
     if args.size == 9:
