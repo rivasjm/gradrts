@@ -243,7 +243,7 @@ if __name__ == '__main__':
     # the over-utilization shortcut is enabled for size 10 only
     prune = args.size == 10
 
-    tools = [
+    all_tools = [
         ("pd", pd_mapping_fp),
         ("hopa", hopa_mapping_fp),
         ("gdpa-prio", partial(gdpa_prio_fp, prune_over_utilized=prune,
@@ -255,17 +255,18 @@ if __name__ == '__main__':
         ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10, prune_over_utilized=prune,
                              vector_cost=args.vector_cost)),
         ("bf", partial(bf_mapping, batch_size=args.batch_size)),
+        ("bf-seq", bf_seq_mapping),
     ]
-    if args.size == 9:
-        # scalar brute force is only practical on the smallest population
-        tools.append(("bf-seq", bf_seq_mapping))
 
     if args.methods:
-        unknown = set(args.methods) - {name for name, _ in tools}
+        unknown = set(args.methods) - {name for name, _ in all_tools}
         if unknown:
             parser.error(f"unknown methods {sorted(unknown)}; "
-                         f"choose from {[name for name, _ in tools]}")
-        tools = [t for t in tools if t[0] in args.methods]
+                         f"choose from {[name for name, _ in all_tools]}")
+        tools = [t for t in all_tools if t[0] in args.methods]
+    else:
+        # bf-seq (scalar brute force) is only in the default run for size 9
+        tools = [t for t in all_tools if t[0] != "bf-seq" or args.size == 9]
 
     if not 1 <= args.start <= len(args.utilizations):
         parser.error(f"--start must be between 1 and {len(args.utilizations)}")
