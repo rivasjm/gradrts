@@ -41,7 +41,7 @@ def main(size):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--size", type=int, default=9, choices=(9, 10),
+    parser.add_argument("--size", type=int, default=9, choices=(9, 10, 12),
                         help="total tasks / scenario size (default: 9)")
     args = parser.parse_args()
     main(args.size)

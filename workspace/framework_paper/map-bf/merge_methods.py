@@ -61,7 +61,7 @@ def regenerate_diagnostics(target, name, labels, n_systems):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--size", type=int, default=9, choices=(9, 10),
+    parser.add_argument("--size", type=int, default=9, choices=(9, 10, 12),
                         help="scenario size (default: 9)")
     parser.add_argument("--target", required=True, help="directory with the full results")
     parser.add_argument("--source", nargs="+", required=True,

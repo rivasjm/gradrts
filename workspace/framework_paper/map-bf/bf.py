@@ -42,7 +42,7 @@ from vector.vector_fp import (MappingPrioritiesMatrix, PrioritiesMatrix,
                               VectorFPGradientFunction, VectorHolisticFPAnalysis)
 
 # size key (total tasks) -> flows x tasks per flow x processors
-SIZES = {9: (3, 3, 3), 10: (2, 5, 3)}
+SIZES = {9: (3, 3, 3), 10: (2, 5, 3), 12: (4, 3, 3)}
 POPULATION = 25
 SEED = 42
 DEADLINE_FACTOR_MIN = 0.5
