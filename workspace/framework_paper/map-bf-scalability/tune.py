@@ -45,6 +45,8 @@ CONFIGS = {
     "mix-md5":     dict(init="mix", chunk=50, restarts=10, **{**STEPS, "mapping_delta": 5.0}),
     "pool+rnd-md5": dict(init="pool+random", chunk=50, restarts=10, **{**STEPS, "mapping_delta": 5.0}),
     "pool+rnd-md2": dict(init="pool+random", chunk=50, restarts=10, **{**STEPS, "mapping_delta": 2.0}),
+    "pool2+rnd5-r10": dict(init="pool2+rnd5", chunk=50, restarts=10, **STEPS),
+    "pool2+rnd5-r20": dict(init="pool2+rnd5", chunk=50, restarts=20, **STEPS),
     "bf":          None,
 }
 ORDER = list(CONFIGS)
@@ -53,18 +55,26 @@ ORDER = list(CONFIGS)
 def run_ms(system, init, chunk, restarts, **steps):
     for r in range(restarts):
         candidate = deepcopy(system)
+        step = dict(steps)
         mode = init
         if init == "mix":
             mode = "random" if r % 2 == 0 else "unbalance"
         elif init == "pool+random":
             mode = "random" if r > 0 else "pool"
+        elif init == "pool2+rnd5":
+            if r == 0:
+                mode = "pool"
+                step["mapping_delta"] = 2.0
+            else:
+                mode = "random"
+                step["mapping_delta"] = 5.0
         if mode == "random":
             rnd = Random(100 + r)
             for task in candidate.tasks:
                 task.processor = candidate.processors[rnd.randrange(len(candidate.processors))]
         elif mode == "unbalance":
             unbalance_contended(candidate)
-        if bf._gdpa_mapping(candidate, limit=chunk, seed=1 + r, **steps):
+        if bf._gdpa_mapping(candidate, limit=chunk, seed=1 + r, **step):
             return True
     return False
 
