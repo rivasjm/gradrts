@@ -40,11 +40,11 @@ def main():
     out.mkdir(exist_ok=True)
     column_labels = [str(size) for size in systems.SIZES]
 
-    def refresh_excel(column, records, finished):
-        counts, times = process.build_tables(records, LABELS, finished)
-        process.write_outputs(counts, times, str(out / "processed.xlsx"),
-                              xlabel="Tasks")
-        print(f"    (excel+figure updated after column {column}: {finished})",
+    def refresh_excel(column, records, done_columns):
+        schedulable, times, finished = process.build_tables(records, LABELS, done_columns)
+        process.write_outputs(schedulable, times, finished,
+                              str(out / "processed.xlsx"), xlabel="Tasks")
+        print(f"    (excel+figure updated after column {column}: {done_columns})",
               flush=True)
 
     records = harness.evaluate(pool, LABELS, FUNCS, threads=args.threads,
@@ -52,12 +52,14 @@ def main():
                                timeouts=TIMEOUTS,
                                output=str(out / "raw.json"),
                                on_column=refresh_excel)
-    counts, times = process.build_tables(records, LABELS, column_labels)
+    schedulable, times, finished = process.build_tables(records, LABELS, column_labels)
 
     print(f"\n=== schedulable (out of {args.systems}) ===")
-    print(counts.to_string())
+    print(schedulable.to_string())
     print("\n=== mean time over schedulable (s) ===")
     print(times.round(3).to_string())
+    print("\n=== finished ===")
+    print(finished.to_string())
     print(f"\nwrote {out / 'raw.json'} and {out / 'processed.xlsx'}")
 
 

@@ -102,22 +102,25 @@ def main():
     raw_path = out / f"{eval_name}_raw.json"
     excel_path = out / f"{eval_name}_processed.xlsx"
 
-    def refresh(column, records, finished):
-        counts, times = process.build_tables(records, labels, finished)
-        process.write_outputs(counts, times, str(excel_path), xlabel="Tasks")
-        print(f"    (excel+figure updated after column {column}: {finished})",
+    def refresh(column, records, done_columns):
+        schedulable, times, finished = process.build_tables(records, labels, done_columns)
+        process.write_outputs(schedulable, times, finished, str(excel_path),
+                              xlabel="Tasks")
+        print(f"    (excel+figure updated after column {column}: {done_columns})",
               flush=True)
 
     records = harness.evaluate(pool, labels, funcs, threads=args.threads,
                                columns=columns, timeouts=timeouts,
                                output=str(raw_path), on_column=refresh)
 
-    counts, times = process.build_tables(records, labels, columns)
-    process.write_outputs(counts, times, str(excel_path), xlabel="Tasks")
+    schedulable, times, finished = process.build_tables(records, labels, columns)
+    process.write_outputs(schedulable, times, finished, str(excel_path), xlabel="Tasks")
     print(f"\n=== schedulable (out of {args.systems}) ===")
-    print(counts.to_string())
+    print(schedulable.to_string())
     print("\n=== mean time over schedulable (s) ===")
     print(times.round(3).to_string())
+    print("\n=== finished ===")
+    print(finished.to_string())
     print(f"\nwrote {out}/{eval_name}_raw.json, "
           f"{eval_name}_processed.xlsx/.png/.pdf")
 

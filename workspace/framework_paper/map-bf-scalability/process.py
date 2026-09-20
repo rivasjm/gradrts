@@ -2,14 +2,16 @@
 
 Reads the flat records produced by ``harness.evaluate`` and writes:
 
-- an Excel with two tables, both ``tool x column``:
+- an Excel with three tables, all ``tool x column``:
   - ``schedulable``: number of systems the tool made schedulable (timeouts and
     tools that ran out without finding a schedule count as not schedulable).
   - ``mean_time``: mean time over the systems the tool made schedulable
     (per tool and column; blank when the tool never succeeded).
-- a two-panel line figure (``<stem>.png`` and ``<stem>.pdf``): schedulable
-  systems on top, mean time below, one line per tool, the horizontal axis
-  being the matrix columns.
+  - ``finished``: number of systems the tool got through within its budget
+    (i.e. the complement of the timeouts).
+- a three-panel line figure (``<stem>.png`` and ``<stem>.pdf``): schedulable
+  systems on top, mean time in the middle, finished systems at the bottom, one
+  line per tool, the horizontal axis being the matrix columns.
 
 The column label comes from the ``"column"`` field of each record, which the
 caller provides to ``harness.evaluate``.
@@ -47,30 +49,37 @@ def _ordered_columns(values):
 
 
 def build_tables(records, tools=None, columns=None):
-    """Return ``(schedulable_counts, mean_times)`` as ``tool x column`` frames."""
+    """Return ``(schedulable, mean_times, finished)`` as ``tool x column`` frames."""
     frame = pd.DataFrame(records)
+    if "timeout" not in frame:  # older raw files only encode it as time=null
+        frame["timeout"] = frame["time"].isna()
     frame["ok"] = frame["schedulable"].astype(int)
+    frame["finished"] = (~frame["timeout"].astype(bool)).astype(int)
 
-    counts = frame.pivot_table(index="tool", columns="column", values="ok",
-                               aggfunc="sum")
+    schedulable = frame.pivot_table(index="tool", columns="column", values="ok",
+                                    aggfunc="sum")
     times = (frame[frame["schedulable"]]
              .pivot_table(index="tool", columns="column", values="time",
                           aggfunc="mean"))
+    finished = frame.pivot_table(index="tool", columns="column", values="finished",
+                                 aggfunc="sum")
 
     tool_order = list(tools) if tools else sorted(frame["tool"].unique())
     col_order = list(columns) if columns else _ordered_columns(frame["column"])
-    counts = counts.reindex(index=tool_order, columns=col_order).astype("Int64")
+    schedulable = schedulable.reindex(index=tool_order, columns=col_order).astype("Int64")
     times = times.reindex(index=tool_order, columns=col_order)
-    return counts, times
+    finished = finished.reindex(index=tool_order, columns=col_order).astype("Int64")
+    return schedulable, times, finished
 
 
-def write_excel(counts, times, path):
-    """Write both tables to ``path``, replacing it atomically."""
+def write_excel(schedulable, times, finished, path):
+    """Write the three tables to ``path``, replacing it atomically."""
     tmp = f"{path}.tmp.xlsx"
     try:
         with pd.ExcelWriter(tmp, engine="openpyxl") as writer:
-            counts.to_excel(writer, sheet_name="schedulable")
+            schedulable.to_excel(writer, sheet_name="schedulable")
             times.to_excel(writer, sheet_name="mean_time")
+            finished.to_excel(writer, sheet_name="finished")
         os.replace(tmp, path)
     finally:
         if os.path.exists(tmp):
@@ -88,42 +97,46 @@ def _atomic_savefig(fig, path):
             os.remove(tmp)
 
 
-def write_figure(counts, times, path, xlabel="column"):
-    """Two-panel line figure: schedulable systems (top) and mean time (bottom),
-    one line per tool, the horizontal axis being the matrix columns."""
-    labels = [str(column) for column in counts.columns]
+def write_figure(schedulable, times, finished, path, xlabel="column"):
+    """Three-panel line figure: schedulable systems, mean time and finished
+    systems (top to bottom), one line per tool, x axis = the matrix columns."""
+    labels = [str(column) for column in schedulable.columns]
     positions = list(range(len(labels)))
+    tools = list(schedulable.index)
 
-    fig, (top, bottom) = plt.subplots(2, 1, figsize=(6.5, 6), sharex=True,
-                                      constrained_layout=True)
-    for tool in counts.index:
-        top.plot(positions, counts.loc[tool].astype(float).to_numpy(),
+    fig, (top, middle, bottom) = plt.subplots(3, 1, figsize=(6.5, 8.5),
+                                              sharex=True, constrained_layout=True)
+    for tool in tools:
+        top.plot(positions, schedulable.loc[tool].astype(float).to_numpy(),
                  marker="o", markersize=4, linewidth=1.5, label=tool)
-        bottom.plot(positions, times.loc[tool].astype(float).to_numpy(),
+        middle.plot(positions, times.loc[tool].astype(float).to_numpy(),
+                    marker="o", markersize=4, linewidth=1.5, label=tool)
+        bottom.plot(positions, finished.loc[tool].astype(float).to_numpy(),
                     marker="o", markersize=4, linewidth=1.5, label=tool)
 
     top.set_ylabel("Schedulable systems", fontweight="bold")
-    bottom.set_ylabel("Mean time to schedulable (s)", fontweight="bold")
+    middle.set_ylabel("Mean time to schedulable (s)", fontweight="bold")
+    middle.set_yscale("log")
+    bottom.set_ylabel("Finished systems", fontweight="bold")
     bottom.set_xlabel(xlabel, fontweight="bold")
-    bottom.set_yscale("log")
     top.set_ylim(bottom=0)
+    bottom.set_ylim(bottom=0)
     bottom.set_xticks(positions)
     bottom.set_xticklabels(labels)
-    top.grid(True, axis="x")
-    bottom.grid(True, axis="x")
-    top.legend(fontsize=8, ncol=2)
-    bottom.legend(fontsize=8, ncol=2)
+    for axes in (top, middle, bottom):
+        axes.grid(True, axis="x")
+        axes.legend(fontsize=8, ncol=2)
 
     _atomic_savefig(fig, path)
     plt.close(fig)
 
 
-def write_outputs(counts, times, excel_path, xlabel="column"):
+def write_outputs(schedulable, times, finished, excel_path, xlabel="column"):
     """Write the Excel and the matching ``.png``/``.pdf`` figure together."""
-    write_excel(counts, times, excel_path)
+    write_excel(schedulable, times, finished, excel_path)
     stem, _ = os.path.splitext(excel_path)
     for extension in (".png", ".pdf"):
-        write_figure(counts, times, stem + extension, xlabel=xlabel)
+        write_figure(schedulable, times, finished, stem + extension, xlabel=xlabel)
 
 
 def main():
@@ -137,9 +150,10 @@ def main():
                         help="horizontal axis label of the figure (default: column)")
     args = parser.parse_args()
 
-    counts, times = build_tables(load(args.input), args.tools)
-    write_outputs(counts, times, args.output, xlabel=args.xlabel)
-    print(f"{args.output}: schedulable\n{counts}\n\nmean_time\n{times}")
+    schedulable, times, finished = build_tables(load(args.input), args.tools)
+    write_outputs(schedulable, times, finished, args.output, xlabel=args.xlabel)
+    print(f"{args.output}: schedulable\n{schedulable}\n\nmean_time\n{times}"
+          f"\n\nfinished\n{finished}")
 
 
 if __name__ == "__main__":
