@@ -14,12 +14,12 @@ the second, ...); ``threads`` systems run in parallel and a free worker takes
 the next one.
 
 Results are raw: a list of ``{"system", "row", "column", "tool", "schedulable",
-"time"}`` dictionaries. ``row`` is the matrix row (a system has no intrinsic
-meaning, but the same row across columns is the same base system) and
-``column`` is the caller-provided label of the matrix column. ``time`` is
-``None`` when the tool exceeded its budget (a timeout counts as not
-schedulable); it is a finite number of seconds otherwise, including when the
-tool ran to completion without finding a schedule.
+"timeout", "time"}`` dictionaries. ``row`` is the matrix row (a system has no
+intrinsic meaning, but the same row across columns is the same base system) and
+``column`` is the caller-provided label of the matrix column. ``timeout`` is
+true when the tool exceeded its budget (which also counts as not schedulable);
+``time`` is ``None`` in that case and a finite number of seconds otherwise,
+including when the tool ran to completion without finding a schedule.
 
 Timeouts
 --------
@@ -85,6 +85,7 @@ def _evaluate_system(task, labels: Sequence[str],
             "column": column,
             "tool": label,
             "schedulable": schedulable,
+            "timeout": timed_out,
             "time": None if timed_out else elapsed,
         })
     return system.name, records
