@@ -9,6 +9,10 @@ The tools and their configuration mirror ``workspace/framework_paper/map-bf/bf.p
 (pd, hopa, gdpa-prio, the bounded multi-start gdpa-100/200/500 and the
 vectorized brute force), all with a 1000 s budget per system and tool.
 
+Artifacts go to ``map-bf-scalability-<u>/`` and carry the scenario name:
+``map-bf-scalability-<u>_raw.json`` plus the processed Excel and figure
+``map-bf-scalability-<u>_processed.xlsx/.png/.pdf``.
+
     .venv/bin/python workspace/framework_paper/map-bf-scalability/map-bf-scalability.py
     .venv/bin/python workspace/framework_paper/map-bf-scalability/map-bf-scalability.py -u 0.6 --threads 6
 """
@@ -92,28 +96,30 @@ def main():
                                  utilization=args.utilization, verbose=True)
     columns = [str(size) for size in systems.SIZES]
 
-    out = (Path(args.output_dir) if args.output_dir
-           else HERE / f"map-bf-scalability-{args.utilization:g}")
+    eval_name = f"map-bf-scalability-{args.utilization:g}"
+    out = Path(args.output_dir) if args.output_dir else HERE / eval_name
     out.mkdir(parents=True, exist_ok=True)
+    raw_path = out / f"{eval_name}_raw.json"
+    excel_path = out / f"{eval_name}_processed.xlsx"
 
     def refresh(column, records, finished):
         counts, times = process.build_tables(records, labels, finished)
-        process.write_outputs(counts, times, str(out / "processed.xlsx"),
-                              xlabel="Tasks")
+        process.write_outputs(counts, times, str(excel_path), xlabel="Tasks")
         print(f"    (excel+figure updated after column {column}: {finished})",
               flush=True)
 
     records = harness.evaluate(pool, labels, funcs, threads=args.threads,
                                columns=columns, timeouts=timeouts,
-                               output=str(out / "raw.json"), on_column=refresh)
+                               output=str(raw_path), on_column=refresh)
 
     counts, times = process.build_tables(records, labels, columns)
-    process.write_outputs(counts, times, str(out / "processed.xlsx"), xlabel="Tasks")
+    process.write_outputs(counts, times, str(excel_path), xlabel="Tasks")
     print(f"\n=== schedulable (out of {args.systems}) ===")
     print(counts.to_string())
     print("\n=== mean time over schedulable (s) ===")
     print(times.round(3).to_string())
-    print(f"\nwrote {out}/raw.json, processed.xlsx, processed.png, processed.pdf")
+    print(f"\nwrote {out}/{eval_name}_raw.json, "
+          f"{eval_name}_processed.xlsx/.png/.pdf")
 
 
 if __name__ == "__main__":

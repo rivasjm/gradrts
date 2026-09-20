@@ -121,9 +121,9 @@ def write_figure(counts, times, path, xlabel="column"):
 def write_outputs(counts, times, excel_path, xlabel="column"):
     """Write the Excel and the matching ``.png``/``.pdf`` figure together."""
     write_excel(counts, times, excel_path)
-    stem = Path(excel_path).with_suffix("")
+    stem, _ = os.path.splitext(excel_path)
     for extension in (".png", ".pdf"):
-        write_figure(counts, times, str(stem.with_suffix(extension)), xlabel=xlabel)
+        write_figure(counts, times, stem + extension, xlabel=xlabel)
 
 
 def main():
