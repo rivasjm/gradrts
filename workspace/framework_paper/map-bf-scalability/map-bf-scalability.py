@@ -76,6 +76,14 @@ def main():
                         help="use the vectorized analysis (and cache) for the GDPA cost")
     parser.add_argument("--batch-size", type=int, default=BF_BATCH_SIZE,
                         help=f"brute-force batch size (default: {BF_BATCH_SIZE})")
+    parser.add_argument("--deadline-factor-min", type=float,
+                        default=systems.DEADLINE_FACTOR_MIN,
+                        help="lower bound of the per-flow deadline factor "
+                             f"(default: {systems.DEADLINE_FACTOR_MIN})")
+    parser.add_argument("--deadline-factor-max", type=float,
+                        default=systems.DEADLINE_FACTOR_MAX,
+                        help="upper bound of the per-flow deadline factor "
+                             f"(default: {systems.DEADLINE_FACTOR_MAX})")
     parser.add_argument("-o", "--output-dir", default=None,
                         help="output directory (default: map-bf-scalability-<u>/ next to this script)")
     args = parser.parse_args()
@@ -93,10 +101,17 @@ def main():
     timeouts = {label: TIMEOUT for label in labels}
 
     pool = systems.generate_pool(n_systems=args.systems,
-                                 utilization=args.utilization, verbose=True)
+                                 utilization=args.utilization,
+                                 deadline_factor_min=args.deadline_factor_min,
+                                 deadline_factor_max=args.deadline_factor_max,
+                                 verbose=True)
     columns = [str(size) for size in systems.SIZES]
 
+    fixed_deadline = (args.deadline_factor_min == systems.DEADLINE_FACTOR_MIN
+                      and args.deadline_factor_max == systems.DEADLINE_FACTOR_MAX)
     eval_name = f"map-bf-scalability-{args.utilization:g}"
+    if not fixed_deadline:
+        eval_name += (f"-df{args.deadline_factor_min:g}-{args.deadline_factor_max:g}")
     out = Path(args.output_dir) if args.output_dir else HERE / eval_name
     out.mkdir(parents=True, exist_ok=True)
     raw_path = out / f"{eval_name}_raw.json"

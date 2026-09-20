@@ -60,8 +60,10 @@ SEED = 42
 UTILIZATION = 0.7
 PERIOD_MIN = 100
 PERIOD_MAX = 1000
-# End-to-end deadline of a flow: D = DEADLINE_FACTOR * F * T.
-DEADLINE_FACTOR = 0.5
+# End-to-end deadline of a flow: D = factor * F * T, with one factor per flow
+# drawn from U(DEADLINE_FACTOR_MIN, DEADLINE_FACTOR_MAX) and kept as it grows.
+DEADLINE_FACTOR_MIN = 0.5
+DEADLINE_FACTOR_MAX = 0.5
 # Pre-scaling utilization of an appended task, drawn from U(0, DELTA_MAX).
 # Must stay below 1 so that the rescaled task never needs a whole processor
 # (see the module docstring); 0.5 is comfortably inside the safe range.
@@ -70,15 +72,17 @@ DELTA_MAX = 0.5
 MAX_ATTEMPTS_FACTOR = 1000
 
 
-def _new_base(rnd: Random, name: str, utilization: float) -> LinearSystem:
-    """Generate a 4-task base with a contended mapping and fixed-u deadlines."""
+def _new_base(rnd: Random, name: str, utilization: float,
+              deadline_factor_min: float, deadline_factor_max: float) -> LinearSystem:
+    """Generate a 4-task base with a contended mapping and per-flow deadlines."""
     system = get_system(BASE_SIZE, rnd, balanced=False, name=name,
-                        deadline_factor_min=DEADLINE_FACTOR,
-                        deadline_factor_max=DEADLINE_FACTOR,
+                        deadline_factor_min=deadline_factor_min,
+                        deadline_factor_max=deadline_factor_max,
                         period_min=PERIOD_MIN, period_max=PERIOD_MAX,
                         utilization=utilization)
     for flow in system.flows:
-        flow.deadline = DEADLINE_FACTOR * len(flow.tasks) * flow.period
+        factor = flow.deadline / (len(flow.tasks) * flow.period)
+        flow.deadline = factor * len(flow.tasks) * flow.period
     return system
 
 
@@ -100,10 +104,11 @@ def _grow(base: LinearSystem, rnd: Random,
     by_size: Dict[int, LinearSystem] = {SIZES[0]: deepcopy(current)}
     for size in SIZES[1:]:
         flow = rnd.choice(current.flows)
+        factor = flow.deadline / (len(flow.tasks) * flow.period)  # per-flow, kept
         task = Task(name=f"{flow.name}_t{size}",
                     wcet=rnd.uniform(0.0, DELTA_MAX) * flow.period)
         flow.add_tasks(task)
-        flow.deadline = DEADLINE_FACTOR * len(flow.tasks) * flow.period
+        flow.deadline = factor * len(flow.tasks) * flow.period
         task.processor = min(current.processors, key=lambda proc: proc.utilization)
 
         set_system_utilization(current, utilization)
@@ -115,6 +120,8 @@ def _grow(base: LinearSystem, rnd: Random,
 
 def generate_pool(n_systems: int = N_SYSTEMS, seed: int = SEED,
                   utilization: float = UTILIZATION,
+                  deadline_factor_min: float = DEADLINE_FACTOR_MIN,
+                  deadline_factor_max: float = DEADLINE_FACTOR_MAX,
                   verbose: bool = True) -> List[List[LinearSystem]]:
     """Build the nested population as a ``systems[row][col]`` matrix.
 
@@ -123,6 +130,10 @@ def generate_pool(n_systems: int = N_SYSTEMS, seed: int = SEED,
     share that characteristic. The rows are nested (same ``i`` across columns
     is the same base) and independent (deep-copied), so a consumer may mutate
     them freely. Every system is named ``sys{i}_n{size}``.
+
+    Each flow keeps one deadline factor drawn from
+    ``U(deadline_factor_min, deadline_factor_max)``; the default (0.5, 0.5)
+    gives the tightest ``D = 0.5 * F * T``.
     """
     rnd = Random(seed)
     matrix: List[List[LinearSystem]] = []
@@ -137,7 +148,9 @@ def generate_pool(n_systems: int = N_SYSTEMS, seed: int = SEED,
                 f"giving up after {attempts} attempts: only "
                 f"{len(matrix)}/{n_systems} systems accepted")
         index = len(matrix)
-        base = _new_base(rnd, name=f"sys{index}", utilization=utilization)
+        base = _new_base(rnd, name=f"sys{index}", utilization=utilization,
+                         deadline_factor_min=deadline_factor_min,
+                         deadline_factor_max=deadline_factor_max)
         sizes = _grow(base, rnd, utilization)
         if sizes is None:
             rejected += 1
@@ -151,7 +164,8 @@ def generate_pool(n_systems: int = N_SYSTEMS, seed: int = SEED,
     if verbose:
         rate = rejected / attempts if attempts else 0.0
         print(f"pool: {n_systems} systems, sizes {SIZES[0]}..{SIZES[-1]}, "
-              f"U={utilization}, seed={seed}")
+              f"U={utilization}, deadline_factor={deadline_factor_min}..{deadline_factor_max}, "
+              f"seed={seed}")
         print(f"attempts={attempts} rejected={rejected} ({rate:.1%} rejection rate)")
     return matrix
 
