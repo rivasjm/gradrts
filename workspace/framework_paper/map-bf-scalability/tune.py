@@ -43,6 +43,8 @@ CONFIGS = {
     "rnd-md10":    dict(init="random", chunk=50, restarts=10, **{**STEPS, "mapping_delta": 10.0}),
     "rnd-md5-r20": dict(init="random", chunk=50, restarts=20, **{**STEPS, "mapping_delta": 5.0}),
     "mix-md5":     dict(init="mix", chunk=50, restarts=10, **{**STEPS, "mapping_delta": 5.0}),
+    "pool+rnd-md5": dict(init="pool+random", chunk=50, restarts=10, **{**STEPS, "mapping_delta": 5.0}),
+    "pool+rnd-md2": dict(init="pool+random", chunk=50, restarts=10, **{**STEPS, "mapping_delta": 2.0}),
     "bf":          None,
 }
 ORDER = list(CONFIGS)
@@ -54,6 +56,8 @@ def run_ms(system, init, chunk, restarts, **steps):
         mode = init
         if init == "mix":
             mode = "random" if r % 2 == 0 else "unbalance"
+        elif init == "pool+random":
+            mode = "random" if r > 0 else "pool"
         if mode == "random":
             rnd = Random(100 + r)
             for task in candidate.tasks:
