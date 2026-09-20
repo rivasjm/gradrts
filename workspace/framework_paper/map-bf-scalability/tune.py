@@ -31,10 +31,11 @@ import bf  # noqa: E402
 import systems  # noqa: E402
 from examples.generator import unbalance_contended  # noqa: E402
 
-STEPS = dict(lr=10.0, warmup=0.0, priority_delta=2.0,
+STEPS = dict(lr=10.0, warmup=0.0, mapping_delta=2.0, priority_delta=2.0,
              prune_over_utilized=True, vector_cost=True)
 CONFIGS = {
     "gdpa-500":    dict(init=None, chunk=50, restarts=10, **STEPS),
+    "md-none":     dict(init=None, chunk=50, restarts=10, **{**STEPS, "mapping_delta": None}),
     "md5":         dict(init=None, chunk=50, restarts=10, **{**STEPS, "mapping_delta": 5.0}),
     "md10":        dict(init=None, chunk=50, restarts=10, **{**STEPS, "mapping_delta": 10.0}),
     "rnd-md2":     dict(init="random", chunk=50, restarts=10, **{**STEPS, "mapping_delta": 2.0}),
