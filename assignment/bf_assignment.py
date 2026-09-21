@@ -205,6 +205,9 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
         pm = np.stack(pm_batch, axis=0)
         self.analysis.apply(system, scenarios=pm)
         r = self.analysis.scenarios_response_times
+        # brute-force scenarios are never revisited; dropping the cache after
+        # each batch keeps its (n-byte-per-candidate) memory bounded
+        self.analysis.cache.reset()
         n = len(system.tasks)
         deadlines = np.array([task.flow.deadline for task in system.tasks]).reshape(n, 1)
         slacks = deadlines - r
@@ -397,6 +400,7 @@ class BruteForceMappingAssignment(AnalysisFunction):
         pm = np.stack(pm_batch, axis=0)
         self.analysis.apply(system, scenarios=pm)
         r = self.analysis.scenarios_response_times
+        self.analysis.cache.reset()  # brute-force scenarios are never revisited
         n = len(system.tasks)
         deadlines = np.array([task.flow.deadline for task in system.tasks]).reshape(n, 1)
         slacks = deadlines - r
