@@ -92,9 +92,10 @@ Flags: `--size {9,10,12}`, `--balanced`, `--methods ...`, `--vector-cost`,
   (returns a saturated infeasible cost immediately, mirroring the vectorized
   over-utilization shortcut). `prune_over_utilized` is enabled for size 10 only
   so far; enabling it changes scalar-cost results broadly.
-- **HOPA** runs up to 160 scalar analyses; on some systems one analysis is
-  very slow, so `hopa_mapping_fp` caps the analysis at `SCALAR_ANALYSIS_MAX_TIME`
-  (0.5 s). Same for `gdpa-prio`.
+- **HOPA** runs up to 160 scalar analyses with no internal cap (the run's global
+  budget bounds it). `gdpa-prio` keeps the mapping fixed, so overloaded
+  processors keep the scalar analysis near its pathological regime; each of its
+  calls is capped at `SCALAR_ANALYSIS_MAX_TIME` (0.5 s).
 - **`bf-seq`** (scalar brute force) can hang on contended systems; it uses a
   `max_time` cap. It matched the vectorized bf exactly on size 9 (459) and is
   ~5x slower on average at size 10 (useful if a slower exact baseline is needed).

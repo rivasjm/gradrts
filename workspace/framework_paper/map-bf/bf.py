@@ -49,8 +49,8 @@ DEADLINE_FACTOR_MIN = 0.5
 DEADLINE_FACTOR_MAX = 1
 PERIOD_MIN = 100
 PERIOD_MAX = 1000
-# HOPA runs up to 160 scalar analyses; some systems make a single analysis
-# converge pathologically slowly, so each call is capped (baseline only).
+# gdpa-prio keeps the mapping fixed, so overloaded processors keep the scalar
+# analysis near its pathological fixed-point regime; each call is capped.
 SCALAR_ANALYSIS_MAX_TIME = 0.5
 # bf-seq is the scalar brute force: cap each candidate's analysis for the same
 # reason (it is a slow reference method).
@@ -80,8 +80,7 @@ def pd_mapping_fp(system: LinearSystem) -> bool:
 
 
 def hopa_mapping_fp(system: LinearSystem) -> bool:
-    analysis = HolisticFPAnalysis(limit_factor=10, reset=False,
-                                  max_time=SCALAR_ANALYSIS_MAX_TIME)
+    analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     HOPAssignment(analysis=analysis).apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
