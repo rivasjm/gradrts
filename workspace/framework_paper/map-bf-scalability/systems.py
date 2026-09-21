@@ -9,7 +9,7 @@ Population design
 Every system starts as a feasible 4-task base with layout ``(2, 2, 3)`` (2
 flows x 2 tasks x 3 processors) and a contended initial mapping; the larger
 sizes are obtained by successively appending one task at the end of a randomly
-chosen flow, up to 15 tasks (layout ``(2, 7.5, 3)`` on average). This makes the
+chosen flow, up to 16 tasks (layout ``(2, 8, 3)`` on average). This makes the
 population *nested*: size ``n`` and ``n + 1`` share all their tasks and
 mappings except the task appended going from ``n`` to ``n + 1``.
 
@@ -55,8 +55,8 @@ from model.linear_system import LinearSystem, Task
 
 # 4-task base: flows x tasks-per-flow x processors.
 BASE_SIZE = (2, 2, 3)
-# Total tasks of the systems evaluated; 15 is the grown target.
-SIZES = tuple(range(4, 16))
+# Total tasks of the systems evaluated; 16 is the grown target.
+SIZES = tuple(range(4, 17))
 N_SYSTEMS = 25
 SEED = 42
 UTILIZATION = 0.75
