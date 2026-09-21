@@ -7,7 +7,7 @@ column.
 
 The tools and their configuration mirror ``workspace/framework_paper/map-bf/bf.py``
 (pd, hopa, gdpa-prio, the bounded multi-start gdpa-100/200/500 and the
-vectorized brute force), all with a 1000 s budget per system and tool.
+vectorized brute force), all with a 1800 s budget per system and tool.
 
 Artifacts go to ``map-bf-scalability-<u>/`` and carry the scenario name:
 ``map-bf-scalability-<u>_raw.json`` plus the processed Excel and figure
@@ -31,7 +31,7 @@ import process  # noqa: E402
 import systems  # noqa: E402
 
 # Defaults for the scenario (all overridable from the command line).
-TIMEOUT = 1000.0
+TIMEOUT = 1800.0
 N_SYSTEMS = systems.N_SYSTEMS
 UTILIZATION = systems.UTILIZATION
 THREADS = 6
