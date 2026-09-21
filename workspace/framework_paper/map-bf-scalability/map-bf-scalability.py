@@ -107,10 +107,10 @@ def main():
                                  verbose=True)
     columns = [str(size) for size in systems.SIZES]
 
-    fixed_deadline = (args.deadline_factor_min == systems.DEADLINE_FACTOR_MIN
-                      and args.deadline_factor_max == systems.DEADLINE_FACTOR_MAX)
+    default_deadline = (args.deadline_factor_min == systems.DEADLINE_FACTOR_MIN
+                        and args.deadline_factor_max == systems.DEADLINE_FACTOR_MAX)
     eval_name = f"map-bf-scalability-{args.utilization:g}"
-    if not fixed_deadline:
+    if not default_deadline:
         eval_name += (f"-df{args.deadline_factor_min:g}-{args.deadline_factor_max:g}")
     out = Path(args.output_dir) if args.output_dir else HERE / eval_name
     out.mkdir(parents=True, exist_ok=True)

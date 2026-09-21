@@ -29,14 +29,16 @@ Feasibility
 Each appended task gets a small pre-scaling utilization ``delta ~ U(0, DELTA_MAX)``
 with period equal to its flow's period. Only the 4-task base has to be feasible:
 a base that already has a processor at utilization >= 1 is discarded and another
-one drawn. This is the UUNIFAST(n=4) feasibility rate (~43 % at U=0.7); it only
-conditions on feasibility and does not select across sizes.
+one drawn (the UUNIFAST(n=4) feasibility rate); this only conditions on
+feasibility and does not select across sizes.
 
 Per size ``n`` the total utilization is fixed to ``U`` with
-``set_system_utilization`` and the deadline of a modified flow is
-``D = DEADLINE_FACTOR * F * T`` (``F`` = tasks currently in the flow, ``T`` =
-flow period), recomputed as the flow grows so the deadline-per-step stays
-comparable across sizes.
+``set_system_utilization`` and each flow keeps one deadline factor drawn from
+``U(DEADLINE_FACTOR_MIN, DEADLINE_FACTOR_MAX)``, so ``D = factor * F * T``
+(``F`` = tasks currently in the flow, ``T`` = flow period) grows with the flow
+and the deadline-per-step stays comparable across sizes. The default factor
+range ``[0.5, 1.0]`` mirrors the other map-* scenarios and avoids the
+degenerate, near-infeasible regime of a fixed ``0.5 * F * T``.
 
 Running from ``code/``::
 
@@ -57,13 +59,13 @@ BASE_SIZE = (2, 2, 3)
 SIZES = tuple(range(4, 13))
 N_SYSTEMS = 25
 SEED = 42
-UTILIZATION = 0.7
+UTILIZATION = 0.75
 PERIOD_MIN = 100
 PERIOD_MAX = 1000
 # End-to-end deadline of a flow: D = factor * F * T, with one factor per flow
 # drawn from U(DEADLINE_FACTOR_MIN, DEADLINE_FACTOR_MAX) and kept as it grows.
 DEADLINE_FACTOR_MIN = 0.5
-DEADLINE_FACTOR_MAX = 0.5
+DEADLINE_FACTOR_MAX = 1.0
 # Pre-scaling utilization of an appended task, drawn from U(0, DELTA_MAX).
 # Must stay below 1 so that the rescaled task never needs a whole processor
 # (see the module docstring); 0.5 is comfortably inside the safe range.
