@@ -149,20 +149,16 @@ class BruteForceFPMappingAssignment(AnalysisFunction):
         pi = len(procs)
         utilization = np.array([t.wcet / t.period for t in tasks])
 
-        mapping_space = list(itertools.product(range(pi), repeat=n))
-        perms_per_mapping = []
-        for mapping in mapping_space:
-            proc_counts = [mapping.count(p) for p in range(pi)]
-            perms = math.prod([math.factorial(c) for c in proc_counts])
-            perms_per_mapping.append(perms)
-
-        self.space_size = sum(perms_per_mapping)
+        # Iterate the p**n mappings lazily: materializing them (and the number
+        # of priority permutations per mapping) exhausts memory from n >= 13.
+        # The size of the (mapping + priorities) space is n! * C(n+p-1, p-1).
+        self.space_size = math.factorial(n) * math.comb(n + pi - 1, pi - 1)
 
         pm_batch = []
         solutions_batch = []
         processed = 0
 
-        for mapping_tuple, n_perms in zip(mapping_space, perms_per_mapping):
+        for mapping_tuple in itertools.product(range(pi), repeat=n):
             if self.prune and self._over_utilized(mapping_tuple, utilization, pi):
                 continue
 
@@ -273,14 +269,10 @@ class BruteForceFPSequentialMappingAssignment(AnalysisFunction):
         pi = len(system.processors)
         utilization = np.array([t.wcet / t.period for t in tasks])
 
-        mapping_space = list(itertools.product(range(pi), repeat=n))
-        perms_per_mapping = []
-        for mapping in mapping_space:
-            proc_counts = [mapping.count(p) for p in range(pi)]
-            perms_per_mapping.append(math.prod(math.factorial(c) for c in proc_counts))
-        self.space_size = sum(perms_per_mapping)
+        # Lazy iteration, as in BruteForceFPMappingAssignment.
+        self.space_size = math.factorial(n) * math.comb(n + pi - 1, pi - 1)
 
-        for mapping_tuple in mapping_space:
+        for mapping_tuple in itertools.product(range(pi), repeat=n):
             if self.prune and self._over_utilized(mapping_tuple, utilization, pi):
                 continue
 
@@ -339,15 +331,14 @@ class BruteForceMappingAssignment(AnalysisFunction):
             "BruteForceMappingAssignment requires every task to have a deadline; " \
             "apply PDAssignment (or EQS/EQF) before invoking this class"
 
-        mapping_space = list(itertools.product(range(pi), repeat=n))
-        self.space_size = len(mapping_space)
+        self.space_size = pi ** n
 
         pm_batch = []
         mappings_batch = []
         priorities_batch = []
         processed = 0
 
-        for mapping_tuple in mapping_space:
+        for mapping_tuple in itertools.product(range(pi), repeat=n):
             # Group task indices by processor index under this candidate mapping
             proc_tasks = [[] for _ in range(pi)]
             for task_idx, proc_idx in enumerate(mapping_tuple):
