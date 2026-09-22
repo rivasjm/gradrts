@@ -62,8 +62,8 @@ Flags: `--size {9,10,12}`, `--balanced`, `--methods ...`, `--vector-cost`,
 
 ## Key findings
 
-- **The GDPA gap vs brute force is entirely about mapping exploration.** The
-  `diagnose.py` classifier over gap cases (size 9, 5 levels) gave
+- **The GDPA gap vs brute force is entirely about mapping exploration.** A gap
+  classifier over gap cases (size 9, 5 levels) gave
   a=8 (mapping left unchanged), b=21 (converged to a worse mapping), c=0
   (priorities never the cause). gdpa stalls at a near-feasible cost early
   (~iter 30-60) and stops improving.
@@ -119,7 +119,6 @@ Flags: `--size {9,10,12}`, `--balanced`, `--methods ...`, `--vector-cost`,
 - `times.py` — time-to-schedulable-solution figure.
 - `merge_methods.py` — merge method columns from a partial `--methods` run into
   the full xlsx (source columns replace target ones; regenerates diagnostics).
-- `diagnose.py` — gap classifier (a/b/c) + GDPA cost/mapping trace.
 
 ## How to run
 
