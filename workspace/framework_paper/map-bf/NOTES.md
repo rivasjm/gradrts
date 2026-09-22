@@ -67,7 +67,7 @@ Flags: `--size {9,10,12}`, `--balanced`, `--methods ...`, `--vector-cost`,
   a=8 (mapping left unchanged), b=21 (converged to a worse mapping), c=0
   (priorities never the cause). gdpa stalls at a near-feasible cost early
   (~iter 30-60) and stops improving.
-- **What closes the gap** (tuning study, `tune.py`, 8 gap levels, bf = 176):
+- **What closes the gap** (tuning study, 8 gap levels, bf = 176):
   - large gradient steps: `mapping_delta`/`priority_delta` 2.0 (134 -> 158)
   - **multi-start**: restarting with different noise seeds (134 -> 169)
   - combined + `limit=500`: 172/200 (gap 4 on those levels)
@@ -119,8 +119,6 @@ Flags: `--size {9,10,12}`, `--balanced`, `--methods ...`, `--vector-cost`,
 - `times.py` — time-to-schedulable-solution figure.
 - `merge_methods.py` — merge method columns from a partial `--methods` run into
   the full xlsx (source columns replace target ones; regenerates diagnostics).
-- `tune.py` + `run_tuning.sh` — GDPA tuning phases (`budget`, `scale`, `push`,
-  `alt`, `final`, `winner`, ...); size 9 only.
 - `diagnose.py` — gap classifier (a/b/c) + GDPA cost/mapping trace.
 
 ## How to run
