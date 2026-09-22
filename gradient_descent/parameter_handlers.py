@@ -16,6 +16,9 @@ class DeadlineHandler(ParameterHandler):
         max_d = max([flow.deadline for flow in system.flows])
         return [t.deadline / max_d for t in system.tasks]
 
+    def size(self, system: LinearSystem) -> int:
+        return len(system.tasks)
+
     def insert(self, system: LinearSystem, x: [float]):
         max_d = max([flow.deadline for flow in system.flows])
         tasks = system.tasks
@@ -29,6 +32,9 @@ class FPHandler(ParameterHandler):
         # max_priority = max(map(lambda t: t.priority, system.tasks))
         r = [sigmoid(t.priority) for t in system.tasks]
         return r
+
+    def size(self, system: LinearSystem) -> int:
+        return len(system.tasks)
 
     def insert(self, system: LinearSystem, x: [float]):
         tasks = system.tasks
@@ -53,8 +59,11 @@ class CompoundHandler(ParameterHandler):
         for handler in self.handlers:
             handler.reset()
 
+    def size(self, S: LinearSystem) -> int:
+        return sum(handler.size(S) for handler in self.handlers)
+
     def block_sizes(self, S: LinearSystem) -> [int]:
-        return [len(handler.extract(S)) for handler in self.handlers]
+        return [handler.size(S) for handler in self.handlers]
 
     def extract(self, S: LinearSystem) -> [float]:
         return [v for handler in self.handlers for v in handler.extract(S)]
@@ -77,7 +86,7 @@ class CompoundHandler(ParameterHandler):
             raise ValueError("handler is not part of this compound")
         mask = []
         for h in self.handlers:
-            mask.extend([h is handler] * len(h.extract(S)))
+            mask.extend([h is handler] * h.size(S))
         return mask
 
 
@@ -85,6 +94,9 @@ class MappingHandler(ParameterHandler):
     def extract(self, S: LinearSystem) -> [float]:
         return [0.55 if task.processor == proc else 0.45
                 for task in S.tasks for proc in S.processors]
+
+    def size(self, S: LinearSystem) -> int:
+        return len(S.processors) * len(S.tasks)
 
     def insert(self, S: LinearSystem, x: [float]) -> None:
         tasks = S.tasks

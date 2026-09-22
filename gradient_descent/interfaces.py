@@ -35,6 +35,15 @@ class ParameterHandler(Function):
         """
         pass
 
+    def size(self, system: SystemModel) -> int:
+        """Length of the parameter vector ``extract`` would return.
+
+        Handlers with a cheap length should override this; the default falls
+        back to actually extracting the vector. Callers that only need the
+        layout (e.g. block sizes) use this instead of ``extract``.
+        """
+        return len(self.extract(system))
+
     def block_sizes(self, system: SystemModel) -> list[int]:
         """Sizes of the consecutive blocks the parameter vector is made of.
 
