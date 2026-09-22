@@ -11,7 +11,7 @@ from assignment.hopa_assignment import HOPAssignment
 from examples.evaluation import SchedRatioEval
 from examples.generator import set_system_utilization, set_utilization
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import FPMappingHandler
+from gradient_descent.parameter_handlers import CompoundHandler, FPHandler, MappingHandler
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
@@ -36,7 +36,8 @@ def pd_fp(system: LinearSystem) -> bool:
 
 def gdpa_mapping_fp(system: LinearSystem, limit: int, max_time: float = None) -> bool:
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False, max_time=max_time)
-    parameter_handler = FPMappingHandler()
+    mapping_handler = MappingHandler()
+    parameter_handler = CompoundHandler([mapping_handler, FPHandler()])
     cost_function = InvslackCost(parameter_handler=parameter_handler, analysis=analysis)
     stop_function = ThresholdStopFunction(limit=limit, max_time=max_time)
     gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
@@ -44,7 +45,7 @@ def gdpa_mapping_fp(system: LinearSystem, limit: int, max_time: float = None) ->
 
     update_function = NoisyAdam(
         warmup_iterations=30,
-        warmup_mask=parameter_handler.mapping_mask(system))
+        warmup_mask=parameter_handler.block_mask(system, mapping_handler))
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                          cost_function=cost_function,
                                          stop_function=stop_function,

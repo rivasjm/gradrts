@@ -34,7 +34,7 @@ from assignment.hopa_assignment import HOPAssignment
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import BlockConstantDelta
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import FPHandler, FPMappingHandler
+from gradient_descent.parameter_handlers import CompoundHandler, FPHandler, MappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from model.linear_system import LinearSystem
@@ -121,7 +121,8 @@ def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
     restart (0 disables restarts); with restarts the optimizer returns the best
     solution found across all chunks. Defaults are a single run.
     """
-    parameter_handler = FPMappingHandler()
+    mapping_handler = MappingHandler()
+    parameter_handler = CompoundHandler([mapping_handler, FPHandler()])
     gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
                                                  sigma=sigma)
     if mapping_delta is not None or priority_delta is not None:
@@ -140,7 +141,7 @@ def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
     update_function = NoisyAdam(
         lr=lr, seed=seed,
         warmup_iterations=warmup,
-        warmup_mask=parameter_handler.mapping_mask(system))
+        warmup_mask=parameter_handler.block_mask(system, mapping_handler))
     optimizer = GradientDescentOptimizer(parameter_handler=parameter_handler,
                                          cost_function=cost_function,
                                          stop_function=stop_function,

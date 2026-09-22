@@ -110,29 +110,5 @@ class MappingHandler(ParameterHandler):
             tasks[i].processor = procs[proc_index]
 
 
-class FPMappingHandler(CompoundHandler):
-    """Mapping block followed by a fixed-priority block (see CompoundHandler)."""
-
-    def __init__(self):
-        self.fp_handler = FPHandler()
-        super().__init__([MappingHandler(), self.fp_handler])
-
-    def mapping_mask(self, S: LinearSystem) -> [bool]:
-        """True for the mapping block (first p*t coordinates), False for priorities."""
-        return self.block_mask(S, self.handlers[0])
-
-
-class DeadlineMappingHandler(CompoundHandler):
-    """Mapping block followed by a deadline block (see CompoundHandler)."""
-
-    def __init__(self):
-        self.deadline_handler = DeadlineHandler()
-        super().__init__([MappingHandler(), self.deadline_handler])
-
-    def mapping_mask(self, S: LinearSystem) -> [bool]:
-        """True for the mapping block (first p*t coordinates), False for deadlines."""
-        return self.block_mask(S, self.handlers[0])
-
-
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))

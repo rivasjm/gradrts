@@ -27,7 +27,7 @@ from assignment.bf_assignment import BruteForceFPMappingAssignment
 from examples.generator import set_system_utilization
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import FPMappingHandler
+from gradient_descent.parameter_handlers import CompoundHandler, FPHandler, MappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import NoisyAdam
 from vector.vector_fp import MappingPrioritiesMatrix, VectorFPGradientFunction
@@ -55,11 +55,13 @@ def run_bf(system):
 
 def run_gdpa(system, limit=200, warmup=30, callback=None):
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
-    handler = FPMappingHandler()
+    mapping_handler = MappingHandler()
+    handler = CompoundHandler([mapping_handler, FPHandler()])
     cost = InvslackCost(parameter_handler=handler, analysis=analysis)
     stop = ThresholdStopFunction(limit=limit)
     gradient = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix())
-    update = NoisyAdam(warmup_iterations=warmup, warmup_mask=handler.mapping_mask(system))
+    update = NoisyAdam(warmup_iterations=warmup,
+                       warmup_mask=handler.block_mask(system, mapping_handler))
     optimizer = GradientDescentOptimizer(parameter_handler=handler, cost_function=cost,
                                          stop_function=stop, gradient_function=gradient,
                                          update_function=update, callback=callback,

@@ -31,7 +31,7 @@ from examples.generator import set_system_utilization
 from gradient_descent.cost_functions import InvslackCost
 from gradient_descent.gradient_function import BlockConstantDelta
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import FPMappingHandler
+from gradient_descent.parameter_handlers import CompoundHandler, FPHandler, MappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
 from gradient_descent.update_functions import Adam, NoisyAdam
 from vector.vector_fp import MappingPrioritiesMatrix, VectorFPGradientFunction
@@ -48,8 +48,8 @@ BASE = {"limit": 200, "warmup": 30, "lr": 3.0, "gamma": 0.9, "noise": True,
 _BASE_SYSTEMS = None
 
 
-class MarginMappingHandler(FPMappingHandler):
-    """FPMappingHandler with a different initial margin between the current
+class MarginMappingHandler(MappingHandler):
+    """MappingHandler with a different initial margin between the current
     processor and the others (default is 0.55 vs 0.45)."""
 
     def __init__(self, current=0.55, other=0.45):
@@ -58,21 +58,20 @@ class MarginMappingHandler(FPMappingHandler):
         self._other = other
 
     def extract(self, S):
-        mapping = [self._current if t.processor == p else self._other
-                   for t in S.tasks for p in S.processors]
-        return mapping + self.fp_handler.extract(S)
+        return [self._current if t.processor == p else self._other
+                for t in S.tasks for p in S.processors]
 
 
 def make_handler(cfg):
     margin = cfg.get("margin")
-    if margin is None:
-        return FPMappingHandler()
-    return MarginMappingHandler(current=margin[0], other=margin[1])
+    mapping = MappingHandler() if margin is None else MarginMappingHandler(margin[0], margin[1])
+    return CompoundHandler([mapping, FPHandler()])
 
 
 def _gdpa_once(system, cfg, callback=None):
     analysis = HolisticFPAnalysis(limit_factor=10, reset=False)
     handler = make_handler(cfg)
+    mapping_handler = handler.handlers[0]
     cost = InvslackCost(parameter_handler=handler, analysis=analysis)
     stop = ThresholdStopFunction(limit=cfg.get("limit", 200))
     gradient = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
@@ -87,7 +86,7 @@ def _gdpa_once(system, cfg, callback=None):
         update = NoisyAdam(lr=cfg.get("lr", 3.0), gamma=cfg.get("gamma", 0.9),
                            seed=cfg.get("seed", 1),
                            warmup_iterations=cfg.get("warmup", 30),
-                           warmup_mask=handler.mapping_mask(system))
+                           warmup_mask=handler.block_mask(system, mapping_handler))
     else:
         update = Adam(lr=cfg.get("lr", 3.0))
     optimizer = GradientDescentOptimizer(parameter_handler=handler,
