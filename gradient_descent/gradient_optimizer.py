@@ -12,7 +12,9 @@ class GradientDescentOptimizer(Function):
                  update_function: UpdateFunction,           # function to compute update vector from a gradient
                  ref_cost_function: CostFunction = None,    # (optional) secondary cost function for logging
                  callback = None,                           # (optional) callback that is called each iteration
-                 verbose = False                            # verbose flag
+                 verbose = False,                           # verbose flag
+                 chunk: int = 0,                            # iterations per restart (0 disables restarts)
+                 restart_x: [float] = None                  # restart point (None = the initial input)
                  ):
         self.parameter_handler = parameter_handler
         self.cost_function = cost_function
@@ -22,6 +24,8 @@ class GradientDescentOptimizer(Function):
         self.ref_cost_function = ref_cost_function
         self.callback = callback
         self.verbose = verbose
+        self.chunk = chunk
+        self.restart_x = restart_x
 
     def reset(self):
         self.parameter_handler.reset()
@@ -32,8 +36,10 @@ class GradientDescentOptimizer(Function):
         self.ref_cost_function.reset()
 
     def apply(self, S: SystemModel) -> [float]:
-        t = 1
+        t = 1                   # global iteration count (for the stop function)
+        local_t = 1             # iteration count within the current chunk
         x = self.parameter_handler.extract(S)  # initial input
+        restart_x = list(x) if self.restart_x is None else list(self.restart_x)
         best = float('inf')     # best cost value, for logging purposes, not necessarily the cost of the solution
         ref_cost = None         # optional alternative cost value, just for logging purposes
         xb = x                  # best input, for logging purposes, not necessarily returned as solution
@@ -61,13 +67,25 @@ class GradientDescentOptimizer(Function):
                 break
 
             nabla = self.gradient_function.compute(S, x)
-            update = self.update_function.update(S, x, nabla, t)
+            # the update function sees the local iteration count, so its noise
+            # schedule and warmup start over with every chunk
+            update = self.update_function.update(S, x, nabla, local_t)
             x = [a + b for a, b in zip(x, update)]
             t = t + 1
 
             # insert into system, extract again to get x properly normalized
             self.parameter_handler.insert(S, x)
             x = self.parameter_handler.extract(S)
+
+            # after ``chunk`` local iterations, restart from the same point with
+            # a fresh update-function seed derived from the chunk index
+            if self.chunk and local_t == self.chunk:
+                x = list(restart_x)
+                self.parameter_handler.insert(S, x)
+                self.update_function.reset(seed=t // self.chunk)
+                local_t = 1
+            else:
+                local_t += 1
 
         solution = self.stop_function.solution(S)
         self.parameter_handler.insert(S, solution)

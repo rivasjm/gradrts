@@ -29,7 +29,7 @@ from analysis.holistic_fp_analysis import HolisticFPAnalysis
 from assignment.assignments import PDAssignment
 from examples.generator import set_system_utilization
 from gradient_descent.cost_functions import InvslackCost
-from gradient_descent.gradient_function import AvgSeparationDelta
+from gradient_descent.gradient_function import BlockConstantDelta
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import FPMappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
@@ -46,32 +46,6 @@ BASE = {"limit": 200, "warmup": 30, "lr": 3.0, "gamma": 0.9, "noise": True,
         "seed": 1, "sigma": 1.5, "mapping_delta": None}
 
 _BASE_SYSTEMS = None
-
-
-class BlockDelta(AvgSeparationDelta):
-    """Shared AvgSeparationDelta, with independent steps per parameter block.
-
-    Coordinates before ``mapping_prefix`` are the mapping block; the rest are
-    priorities. A ``None`` override keeps the shared delta for that block, so
-    the two blocks can be steered independently (e.g. a larger step for the
-    mapping without disturbing the priorities).
-    """
-
-    def __init__(self, sigma, mapping_prefix, mapping_delta=None, priority_delta=None):
-        super().__init__(sigma=sigma)
-        self.mapping_prefix = mapping_prefix
-        self.mapping_delta = mapping_delta
-        self.priority_delta = priority_delta
-
-    def apply(self, system, x):
-        base = super().apply(system, x)
-        out = []
-        for i in range(len(x)):
-            if i < self.mapping_prefix:
-                out.append(base[i] if self.mapping_delta is None else self.mapping_delta)
-            else:
-                out.append(base[i] if self.priority_delta is None else self.priority_delta)
-        return out
 
 
 class MarginMappingHandler(FPMappingHandler):
@@ -104,11 +78,11 @@ def _gdpa_once(system, cfg, callback=None):
     gradient = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
                                         sigma=cfg.get("sigma", 1.5))
     if cfg.get("mapping_delta") is not None or cfg.get("priority_delta") is not None:
-        p = len(system.processors)
-        t = len(system.tasks)
-        gradient.delta_function = BlockDelta(cfg.get("sigma", 1.5), p * t,
-                                             mapping_delta=cfg.get("mapping_delta"),
-                                             priority_delta=cfg.get("priority_delta"))
+        mapping_size, priority_size = handler.block_sizes(system)
+        gradient.delta_function = BlockConstantDelta(
+            sigma=cfg.get("sigma", 1.5),
+            blocks=[(mapping_size, cfg.get("mapping_delta")),
+                    (priority_size, cfg.get("priority_delta"))])
     if cfg.get("noise", True):
         update = NoisyAdam(lr=cfg.get("lr", 3.0), gamma=cfg.get("gamma", 0.9),
                            seed=cfg.get("seed", 1),

@@ -29,6 +29,33 @@ class AvgSeparationDelta(Function):
         return [self.sigma * sum(seps) / len(seps)]*len(x)
 
 
+class BlockConstantDelta(AvgSeparationDelta):
+    """AvgSeparationDelta with a per-block override for the finite-difference step.
+
+    ``blocks`` is a sequence of ``(count, delta)`` pairs describing consecutive
+    parameter blocks (in the same order as the parameter vector); a ``delta``
+    of ``None`` keeps the shared delta for that block. Coordinates after the
+    last block also keep the shared delta, so a partial description is allowed.
+    This lets the blocks be steered independently (e.g. a larger step for a
+    mapping block without disturbing a priority block).
+    """
+
+    def __init__(self, sigma=1.5, blocks=()):
+        super().__init__(sigma=sigma)
+        self.blocks = list(blocks)
+
+    def apply(self, S: SystemModel, x: [float]) -> [float]:
+        base = super().apply(S, x)
+        out = []
+        i = 0
+        for count, delta in self.blocks:
+            for _ in range(count):
+                out.append(base[i] if delta is None else delta)
+                i += 1
+        out.extend(base[i:])
+        return out
+
+
 def gradient_inputs_from_deltas(x, deltas) -> [[float]]:
     ret = []
     for i in range(len(x)):

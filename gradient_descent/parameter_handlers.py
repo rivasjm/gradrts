@@ -71,6 +71,10 @@ class FPMappingHandler(ParameterHandler):
         t = len(S.tasks)
         return [True] * (p * t) + [False] * t
 
+    def block_sizes(self, S: LinearSystem) -> [int]:
+        """Mapping block (p*t) followed by the priority block (t)."""
+        return [len(S.processors) * len(S.tasks), len(S.tasks)]
+
 
 class DeadlineMappingHandler(ParameterHandler):
     def __init__(self):
@@ -105,6 +109,10 @@ class DeadlineMappingHandler(ParameterHandler):
         p = len(S.processors)
         t = len(S.tasks)
         return [True] * (p * t) + [False] * t
+
+    def block_sizes(self, S: LinearSystem) -> [int]:
+        """Mapping block (p*t) followed by the deadline block (t)."""
+        return [len(S.processors) * len(S.tasks), len(S.tasks)]
 
 
 class MappingHandler(ParameterHandler):

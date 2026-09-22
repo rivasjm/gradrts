@@ -12,7 +12,9 @@ class GradientNoise(UpdateFunction):
         self.rng = None
         self.reset()
 
-    def reset(self):
+    def reset(self, seed=None):
+        if seed is not None:
+            self.seed = seed
         self.rng = np.random.default_rng(self.seed)
 
     def update(self, S: SystemModel, x: [float], nabla: [float], t: int) -> [float]:
@@ -39,7 +41,7 @@ class Adam(UpdateFunction):
         self.epsilon = epsilon
         self.reset()
 
-    def reset(self):
+    def reset(self, seed=None):
         self.size = None
         self.m = None
         self.v = None
@@ -78,8 +80,8 @@ class NoisyAdam(UpdateFunction):
         self.warmup_iterations = warmup_iterations
         self.warmup_mask = None if warmup_mask is None else list(warmup_mask)
 
-    def reset(self):
-        self.noise.reset()
+    def reset(self, seed=None):
+        self.noise.reset(seed)
         self.adam.reset()
 
     def update(self, S: SystemModel, x: [float], nabla: [float], t: int) -> [float]:

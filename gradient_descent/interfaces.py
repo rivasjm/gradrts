@@ -30,10 +30,21 @@ class ParameterHandler(Function):
         Inserts the given parameters (list of floats) into the system.
 
         Args:
-            system: The real-time system into which to insert the parameters.
+            system: The real-time system into which the parameters are inserted.
             x: A list of floats representing the parameters to be inserted.
         """
         pass
+
+    def block_sizes(self, system: SystemModel) -> list[int]:
+        """Sizes of the consecutive blocks the parameter vector is made of.
+
+        Callers that treat parameter blocks differently (e.g. a per-block
+        finite-difference step) use this instead of recomputing the layout, so
+        the block structure stays in sync with ``extract``/``insert``. Returns
+        ``[]`` by default (a single, unblocked vector).
+        """
+        return []
+
 
 class CostFunction(Function):
     """
@@ -122,6 +133,15 @@ class UpdateFunction(Function):
     determine how the parameters are updated based on the gradient
     and other relevant information (e.g., iteration number, learning rate).
     """
+    def reset(self, seed=None):
+        """Clears the internal state, optionally reseeding any randomness.
+
+        Args:
+            seed: New seed for the update function's random state, or ``None``
+                to keep the current one.
+        """
+        pass
+
     @abstractmethod
     def update(self, system: SystemModel, x: list[float], nabla: list[float], t: int) -> list[float]:
         """

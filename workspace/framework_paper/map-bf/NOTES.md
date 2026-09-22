@@ -31,11 +31,13 @@ periods 100–1000, deadline factors 0.5–1, 20 utilization levels (0.5–0.9).
 `gdpa-500`, `bf`, and (`--methods bf-seq` / size 9 default) `bf-seq`.
 
 - `gdpa-prio`: GDPA optimizing only priorities (mapping fixed).
-- `gdpa-100/200/500`: **bounded multi-start** GDPA. Each restart gets `chunk`
-  iterations; the number in the name is the total budget `chunk * restarts`:
-  - gdpa-100 = chunk 25 x 4
-  - gdpa-200 = chunk 20 x 10
-  - gdpa-500 = chunk 50 x 10
+- `gdpa-100/200/500`: **bounded multi-start** GDPA. The optimizer
+  (`GradientDescentOptimizer(chunk=...)`) restarts every `chunk` iterations and
+  returns the best solution across all chunks; the number in the name is the
+  total iteration budget `limit`:
+  - gdpa-100 = limit 100, chunk 25
+  - gdpa-200 = limit 200, chunk 20
+  - gdpa-500 = limit 500, chunk 50
   Parameters: `lr=10`, `warmup=0`, `mapping_delta=2.0`, `priority_delta=2.0`
   (large learning rate and per-block finite-difference steps, no warmup).
 - `bf`: `BruteForceFPMappingAssignment` (vectorized, batch 10000, utilization
@@ -72,7 +74,9 @@ Flags: `--size {9,10,12}`, `--balanced`, `--methods ...`, `--vector-cost`,
   - noise is essential (Adam without noise scored 50/200)
   - warmup and gamma did not help; wider mapping margins hurt.
 - **Bounded restarts** (user idea): share a fixed budget, restart every `chunk`
-  iterations. `chunk=50, restarts=10, warmup=0` reaches the same quality as the
+  iterations, now implemented inside `GradientDescentOptimizer` (the update
+  function sees a local iteration count and is reseeded per restart).
+  `limit=500, chunk=50, warmup=0` reaches the same quality as the
   2500-iteration version with 5x less compute.
 - **Balanced vs unbalanced**: balanced systems are easier (bf 459 -> 493) but
   the **gap grows** (6 -> 29), concentrated at u >= 0.8. At u=0.9 gdpa-500

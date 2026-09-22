@@ -10,7 +10,8 @@ so the script is self-contained and it is clear what is being evaluated:
 - ``pd`` / ``hopa``: baselines (PD and HOPA) that only assign priorities.
 - ``gdpa-prio``: GDPA optimizing only priorities (mapping fixed).
 - ``gdpa-100/200/500``: bounded multi-start GDPA over mapping + priorities,
-  with ``chunk * restarts`` total iterations (25x4, 20x10, 50x10).
+  with a total iteration budget of 100/200/500 and a restart every 25/20/50
+  iterations.
 - ``bf``: vectorized exhaustive search over mappings + priorities.
 
 All tools get a 1800 s budget per system (a timeout counts as not schedulable).
@@ -23,7 +24,6 @@ Artifacts go to ``map-bf-scalability-<u>/`` and carry the scenario name:
 """
 
 import argparse
-from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
@@ -32,7 +32,7 @@ from assignment.assignments import PDAssignment
 from assignment.bf_assignment import BruteForceFPMappingAssignment
 from assignment.hopa_assignment import HOPAssignment
 from gradient_descent.cost_functions import InvslackCost
-from gradient_descent.gradient_function import AvgSeparationDelta
+from gradient_descent.gradient_function import BlockConstantDelta
 from gradient_descent.gradient_optimizer import GradientDescentOptimizer
 from gradient_descent.parameter_handlers import FPHandler, FPMappingHandler
 from gradient_descent.stop_functions import ThresholdStopFunction
@@ -61,6 +61,11 @@ ORDER = ("pd", "hopa", "gdpa-prio", "gdpa-100", "gdpa-200", "gdpa-500", "bf")
 # gdpa-prio keeps the mapping fixed, so overloaded processors keep the scalar
 # analysis near its pathological fixed-point regime; each call is capped.
 SCALAR_ANALYSIS_MAX_TIME = 0.5
+
+# Bounded multi-start GDPA steps (large per-block finite-difference steps and
+# learning rate, no warmup). Paired with ``chunk`` the total budget is the
+# ``limit`` passed to each method.
+MS = dict(lr=10.0, warmup=0, mapping_delta=2.0, priority_delta=2.0)
 
 
 def pd_mapping_fp(system: LinearSystem) -> bool:
@@ -106,38 +111,24 @@ def gdpa_prio_fp(system: LinearSystem, prune_over_utilized: bool = False,
     return system.is_schedulable()
 
 
-class BlockDelta(AvgSeparationDelta):
-    """Shared AvgSeparationDelta with independent finite-difference steps for
-    the mapping block and the priority block (``None`` keeps the shared one)."""
-
-    def __init__(self, sigma, mapping_prefix, mapping_delta=None, priority_delta=None):
-        super().__init__(sigma=sigma)
-        self.mapping_prefix = mapping_prefix
-        self.mapping_delta = mapping_delta
-        self.priority_delta = priority_delta
-
-    def apply(self, system, x):
-        base = super().apply(system, x)
-        out = []
-        for i in range(len(x)):
-            if i < self.mapping_prefix:
-                out.append(base[i] if self.mapping_delta is None else self.mapping_delta)
-            else:
-                out.append(base[i] if self.priority_delta is None else self.priority_delta)
-        return out
-
-
 def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
                   mapping_delta=None, priority_delta=None, seed=1,
-                  prune_over_utilized=False, vector_cost=False):
+                  prune_over_utilized=False, vector_cost=False,
+                  chunk=0, restart_x=None):
+    """GDPA over mapping + priorities.
+
+    ``limit`` is the total iteration budget and ``chunk`` the iterations per
+    restart (0 disables restarts); with restarts the optimizer returns the best
+    solution found across all chunks. Defaults are a single run.
+    """
     parameter_handler = FPMappingHandler()
     gradient_function = VectorFPGradientFunction(scenarios_builder=MappingPrioritiesMatrix(),
                                                  sigma=sigma)
     if mapping_delta is not None or priority_delta is not None:
-        p = len(system.processors)
-        t = len(system.tasks)
-        gradient_function.delta_function = BlockDelta(
-            sigma, p * t, mapping_delta=mapping_delta, priority_delta=priority_delta)
+        mapping_size, priority_size = parameter_handler.block_sizes(system)
+        gradient_function.delta_function = BlockConstantDelta(
+            sigma=sigma, blocks=[(mapping_size, mapping_delta),
+                                 (priority_size, priority_delta)])
     if vector_cost:
         analysis = VectorHolisticFPAnalysis(limit_factor=10,
                                             cache=gradient_function.cache)
@@ -155,31 +146,15 @@ def _gdpa_mapping(system, limit, lr=3.0, warmup=30, sigma=1.5,
                                          stop_function=stop_function,
                                          gradient_function=gradient_function,
                                          update_function=update_function,
-                                         verbose=False)
+                                         verbose=False,
+                                         chunk=chunk,
+                                         restart_x=restart_x)
 
     pd = PDAssignment(normalize=True)
     pd.apply(system)
     optimizer.apply(system)
     HolisticFPAnalysis(limit_factor=1, reset=True).apply(system)
     return system.is_schedulable()
-
-
-def gdpa_ms_fp(system: LinearSystem, chunk: int, restarts: int,
-               prune_over_utilized: bool = False,
-               vector_cost: bool = False) -> bool:
-    """Bounded multi-start GDPA over mapping + priorities.
-
-    Each restart gets ``chunk`` iterations with large per-block finite-difference
-    steps and a different noise seed; the total is bounded by ``chunk * restarts``
-    (the number in the method name).
-    """
-    steps = dict(lr=10.0, warmup=0, mapping_delta=2.0, priority_delta=2.0,
-                 prune_over_utilized=prune_over_utilized, vector_cost=vector_cost)
-    for restart in range(restarts):
-        candidate = deepcopy(system)
-        if _gdpa_mapping(candidate, limit=chunk, seed=1 + restart, **steps):
-            return True
-    return False
 
 
 def bf_mapping(system: LinearSystem, batch_size: int, prune: bool = True) -> bool:
@@ -197,9 +172,9 @@ def build_tools(vector_cost=VECTOR_COST, prune_over_utilized=PRUNE_OVER_UTILIZED
         ("pd", pd_mapping_fp),
         ("hopa", hopa_mapping_fp),
         ("gdpa-prio", partial(gdpa_prio_fp, **gdpa)),
-        ("gdpa-100", partial(gdpa_ms_fp, chunk=25, restarts=4, **gdpa)),
-        ("gdpa-200", partial(gdpa_ms_fp, chunk=20, restarts=10, **gdpa)),
-        ("gdpa-500", partial(gdpa_ms_fp, chunk=50, restarts=10, **gdpa)),
+        ("gdpa-100", partial(_gdpa_mapping, limit=100, chunk=25, **gdpa, **MS)),
+        ("gdpa-200", partial(_gdpa_mapping, limit=200, chunk=20, **gdpa, **MS)),
+        ("gdpa-500", partial(_gdpa_mapping, limit=500, chunk=50, **gdpa, **MS)),
         ("bf", partial(bf_mapping, batch_size=bf_batch_size, prune=bf_prune)),
     ]
     return zip(*tools)
