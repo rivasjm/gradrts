@@ -9,8 +9,8 @@
 # It can also be invoked from anywhere; from code/:
 #   bash workspace/framework_paper/run_all.sh [scenarios...]
 #
-# Passing all three scenarios is equivalent to passing none. Figures are only
-# regenerated when every scenario runs, since they combine all of them.
+# Passing all three scenarios is equivalent to passing none. The figures are
+# regenerated at the end from whatever data is available.
 #
 # To see the output live and also save it to a log (recommended for long runs):
 #   ./run_all.sh 2>&1 | tee run_all.log
@@ -75,11 +75,9 @@ if $run_edf; then
     done
 fi
 
-if $run_fp && $run_map && $run_edf; then
-    echo "=== Figures ==="
-    "$PY" workspace/framework_paper/charts.py
-    "$PY" workspace/framework_paper/times.py
-    "$PY" workspace/framework_paper/charts-efficiency.py
-fi
+echo "=== Figures ==="
+"$PY" workspace/framework_paper/figures-fp.py
+"$PY" workspace/framework_paper/figures-edf.py
+"$PY" workspace/framework_paper/figures-map.py
 
 echo "Done."
