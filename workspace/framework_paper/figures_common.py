@@ -40,16 +40,14 @@ METHOD_STYLES = {
     'bf':        {'color': '#FF0000', 'marker': '*', 'ls': '-'},
 }
 
-# Legend labels: the paper writes every method in uppercase (GDPA, HOPA, PD,
+# Legend labels: the paper writes every method in uppercase (GDPA, HOSPA, PD,
 # BF, GDPA-100, ...), so the column names are upper-cased unless overridden here.
-METHOD_LABELS = {}
+# The ``hopa`` column is HOSPA, the generalization of HOPA to FP and EDF (under
+# FP it is equivalent to HOPA), which is the name used in the paper.
+METHOD_LABELS = {'hopa': 'HOSPA'}
 
 
-def legend_label(name, labels=None):
-    """Legend label of a method; ``labels`` overrides it for a single figure
-    (e.g. HOPA is called HOSPA in the EDF scenario)."""
-    if labels and name in labels:
-        return labels[name]
+def legend_label(name):
     return METHOD_LABELS.get(name, name.upper())
 
 
@@ -67,13 +65,13 @@ def load(key, size, suffix, extra=()):
     return df[[c for c in columns if c in df.columns]].copy()
 
 
-def draw(ax, df, logy=False, labels=None):
+def draw(ax, df, logy=False):
     """Plot every column of ``df`` on ``ax`` using the shared styles."""
     for col in df.columns:
         style = METHOD_STYLES[col]
         ax.plot(df.index, df[col], color=style['color'], marker=style['marker'],
                 linestyle=style['ls'], linewidth=1.2, markersize=4,
-                label=legend_label(col, labels))
+                label=legend_label(col))
     ax.set_xlabel("Average Utilization", fontweight='bold', fontsize=8)
     ax.grid(True, which='major', axis='x')
     if logy:
@@ -114,7 +112,7 @@ def add_scenario_label(ax, text, corner):
         _box(ax, text, (0.03, 0.05), 'left', 'bottom')
 
 
-def plot_grid(sched, times, panel_titles, out_stem, scenario, legend_cols=4, labels=None):
+def plot_grid(sched, times, panel_titles, out_stem, scenario, legend_cols=4):
     """One double-column 2x2 figure per scenario: schedulable systems on the top
     row and mean time to a schedulable solution (log scale) on the bottom row,
     one column per system size. Every panel shares the utilization axis, and the
@@ -140,7 +138,7 @@ def plot_grid(sched, times, panel_titles, out_stem, scenario, legend_cols=4, lab
     letters = iter('abcd')
     for row, (frames, ylabel, logy, corner) in zip(axes, rows):
         for col, (ax, df, title) in enumerate(zip(row, frames, panel_titles)):
-            draw(ax, df, logy=logy, labels=labels)
+            draw(ax, df, logy=logy)
             if logy:
                 # one major tick per decade, also in the reduced panel height
                 ax.yaxis.set_major_locator(LogLocator(base=10, numticks=20))

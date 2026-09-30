@@ -405,7 +405,7 @@ ParameterHandler.extract(system)  →  x  (list of floats, e.g. sigmoid-encoded 
 while not stop:
     cost = CostFunction.compute(system, x)          # insert x, run Holistic, measure slack
     grad = GradientFunction.compute(system, x)       # perturb x, batch-evaluate, FD gradient
-    update = UpdateFunction.update(system, x, grad, t)  # Adam + noise
+    update = UpdateFunction.update(x, grad, t)  # Adam + noise
     x ← x + update
     ParameterHandler.insert(system, x)  →  x ← ParameterHandler.extract(system)  (normalise)
 

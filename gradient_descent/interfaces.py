@@ -152,12 +152,11 @@ class UpdateFunction(Function):
         pass
 
     @abstractmethod
-    def update(self, system: SystemModel, x: list[float], nabla: list[float], t: int) -> list[float]:
+    def update(self, x: list[float], nabla: list[float], t: int) -> list[float]:
         """
         Computes the updated parameter values.
 
         Args:
-            system: The real-time system being optimized.
             x: A list of floats representing the current parameter values.
             nabla: A list of floats representing the gradient vector.
             t: The current iteration number.

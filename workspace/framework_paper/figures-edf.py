@@ -21,9 +21,7 @@ def main():
     sched = [load(KEY, size, 'schedulables') for size in SIZES]
     times = [load(KEY, size, 'times_success') for size in SIZES]
 
-    # In EDF the HOPA scheme assigns scheduling deadlines, i.e. it is HOSPA.
-    plot_grid(sched, times, TITLES, HERE / KEY, SCENARIO, legend_cols=3,
-              labels={'hopa': 'HOSPA'})
+    plot_grid(sched, times, TITLES, HERE / KEY, SCENARIO, legend_cols=3)
 
 
 if __name__ == '__main__':

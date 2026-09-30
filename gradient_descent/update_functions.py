@@ -1,5 +1,4 @@
 from gradient_descent.interfaces import UpdateFunction
-from model.system_model import SystemModel
 import numpy as np
 import math
 
@@ -17,7 +16,7 @@ class GradientNoise(UpdateFunction):
             self.seed = seed
         self.rng = np.random.default_rng(self.seed)
 
-    def update(self, S: SystemModel, x: [float], nabla: [float], t: int) -> [float]:
+    def update(self, x: [float], nabla: [float], t: int) -> [float]:
         # noise added to the gradients helps with the optimization
         # the noise decays with the iterations
         # for big systems (e.g. 10x10x5), it is beneficial to reduce the noise added, so
@@ -46,7 +45,7 @@ class Adam(UpdateFunction):
         self.m = None
         self.v = None
 
-    def update(self, S: SystemModel, x: [float], nabla: [float], t: int) -> [float]:
+    def update(self, x: [float], nabla: [float], t: int) -> [float]:
         if not self.size:
             self.size = len(nabla)
             self.m = [0]*self.size
@@ -84,9 +83,9 @@ class NoisyAdam(UpdateFunction):
         self.noise.reset(seed)
         self.adam.reset()
 
-    def update(self, S: SystemModel, x: [float], nabla: [float], t: int) -> [float]:
-        noisy_gradient = self.noise.update(S, x, nabla, t)
-        update = self.adam.update(S, x, noisy_gradient, t)
+    def update(self, x: [float], nabla: [float], t: int) -> [float]:
+        noisy_gradient = self.noise.update(x, nabla, t)
+        update = self.adam.update(x, noisy_gradient, t)
         if self.warmup_mask is not None and t <= self.warmup_iterations:
             assert len(self.warmup_mask) == len(update)
             update = [0.0 if m else u for u, m in zip(update, self.warmup_mask)]

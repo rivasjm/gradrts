@@ -69,7 +69,7 @@ class GradientDescentOptimizer(Function):
             nabla = self.gradient_function.compute(S, x)
             # the update function sees the local iteration count, so its noise
             # schedule and warmup start over with every chunk
-            update = self.update_function.update(S, x, nabla, local_t)
+            update = self.update_function.update(x, nabla, local_t)
             x = [a + b for a, b in zip(x, update)]
             t = t + 1
 

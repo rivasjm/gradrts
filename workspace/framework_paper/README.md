@@ -119,7 +119,7 @@ Methods compared per scenario (column names in the `.xlsx` files):
   `gdpa-200` and `gdpa-500` share a total iteration budget restarting every
   25/20/50 iterations, and `gdpa-prio` optimizes only priorities keeping the
   mapping fixed.
-- `hopa`: the iterative HOPA algorithm.
+- `hopa`: the iterative HOSPA algorithm (the generalization of HOPA to FP and EDF; under FP it is equivalent to HOPA). It is labelled HOSPA in the paper figures.
 - `pd`: proportional deadlines assignment (non-iterative).
 - `bf`: exhaustive search over priorities (FP size 15 only; it evaluates all
   $5!^3 = 1{,}728{,}000$ orderings) and over mappings + priorities (MAP, where
