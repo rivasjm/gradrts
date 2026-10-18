@@ -1,0 +1,12 @@
+# Dependencies for this sandbox.
+#
+# matplotlib is required: `run.py` draws a per-pool progress chart. Create a
+# local virtual environment inside the sandbox and install:
+#
+#     python -m venv .venv
+#     .venv/bin/pip install -r requirements.txt
+#     .venv/bin/python run.py
+#
+# Add any other dependency you need below (for example a deep-learning
+# framework); this file is yours to edit.
+matplotlib>=3.9

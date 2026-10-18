@@ -1,0 +1,19 @@
+--- permutations of the best budget-feasible shape gn0.6 (sum fixed) ---
+=== seed=42 size=15 systems=50 levels=20 instances=1000 ===
+  technique           sched   ratio    tot_t
+  gn06_(0, 1, 2)        762   76.2%    0.005
+  gn06_(0, 2, 1)        331   33.1%    0.005
+  gn06_(1, 0, 2)        305   30.5%    0.005
+  gn06_(1, 2, 0)        152   15.2%    0.005
+  gn06_(2, 0, 1)         89    8.9%    0.005
+  gn06_(2, 1, 0)        175   17.5%    0.005
+
+--- permutations of the cumulative (pd_global) shape ---
+=== seed=42 size=15 systems=50 levels=20 instances=1000 ===
+  technique           sched   ratio    tot_t
+  cum_(0, 1, 2)         744   74.4%    0.004
+  cum_(0, 2, 1)         379   37.9%    0.004
+  cum_(1, 0, 2)         375   37.5%    0.004
+  cum_(1, 2, 0)         217   21.7%    0.004
+  cum_(2, 0, 1)         135   13.5%    0.004
+  cum_(2, 1, 0)         179   17.9%    0.004

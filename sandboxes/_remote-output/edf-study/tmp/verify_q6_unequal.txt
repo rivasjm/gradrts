@@ -1,0 +1,17 @@
+unequal targets [0.6, 0.75, 0.9], 50 systems, total 50 instances
+  pd                       31/50
+  global_g0.3_l2.0         41/50
+  global_g0.2_l2.0         44/50
+  global_g0.3_l2.5         43/50
+  perproc_g0.3_0+3u        43/50
+  perproc_g0.3_1+2u        43/50
+  perproc_g0.2_0+3u        42/50
+
+(also: equal-load sanity, all procs scaled to 0.75)
+  pd                       33/50
+  global_g0.3_l2.0         46/50
+  global_g0.2_l2.0         45/50
+  global_g0.3_l2.5         44/50
+  perproc_g0.3_0+3u        44/50
+  perproc_g0.3_1+2u        44/50
+  perproc_g0.2_0+3u        45/50

@@ -1,342 +1,224 @@
-# EDF Gradient Descent: Surrogate, Vectorized, and Exact Approaches
+# EDF deadline optimisation: analyses and approaches
 
-This document summarises the investigation into EDF local deadline optimisation
-using gradient-based methods.  All code lives under `code/`.
-
----
-
-## 1. Background
-
-The goal is to assign per-task deadlines for **Local EDF** scheduling such that
-the system becomes schedulable.  Three gradient-descent strategies were
-explored:
-
-| Strategy | Gradient source | Speed | Accuracy |
-|---|---|---|---|
-| **Sequential FD** | Finite differences on scalar `HolisticLocalEDFAnalysis` | 1× (gold standard) | 100 % |
-| **Surrogate** | Autograd on a soft differentiable model | 13× per grad | ~87 % schedulability |
-| **Vectorized V2** | Finite differences on batched exact analysis | 7–8× per grad | ~94 % of Seq gap |
+This document describes the **local-EDF deadline-assignment** stack in `code/`:
+the response-time analysis, the gradient/descent methods built on it, and a
+vectorized analysis for evaluating many deadline assignments at once.
 
 ---
 
-## 2. Sequential FD (reference)
+## 1. The problem
+
+Assign each task's **local deadline** (`task.deadline`) so that the system is
+schedulable under **local EDF**. Every processor runs EDF (local clocks); a
+task's interference depends on the absolute-deadline points (the set the code
+calls `psi`) of its processor-mates, and release jitter propagates across the
+flow (a task's jitter is its predecessor's WCRT). The task -> processor mapping
+is fixed; the local deadlines are the only knob.
+
+---
+
+## 2. Scalar analysis (the reference)
+
+**File:** `analysis/holistic_local_edf_analysis.py` -> `HolisticLocalEDFAnalysis`
+
+For one system with one set of deadlines it computes each task's worst-case
+response time (WCRT). It is *holistic*: jitter coupling is solved by an outer
+fixed point, tasks are processed in `system.tasks` order, and the response time
+of a task is the max over the candidate `psi` points in each busy-period window.
+
+It is **the reference** used to score any assignment: the judge runs it with
+`limit_factor=1`, while search methods may use a higher `limit_factor` so that
+near-infeasible states still return usable values.
+
+---
+
+## 3. Sequential finite-difference gradient
+
+**File:** `gradient_descent/gradient_function.py` -> `SequentialGradientFunction`
+
+Central differences over the scalar analysis (**2n** analysis calls per
+gradient). This is what the paper's EDF scenario
+(`workspace/framework_paper/edf/edf.py`) uses, together with `DeadlineHandler`
+(`gradient_descent/parameter_handlers.py`), `InvslackCost` and
+`GradientDescentOptimizer`. Exact gradient, but O(n^2) per optimizer iteration.
+
+---
+
+## 4. Vectorized exact analysis
+
+**File:** `vector/vector_edf.py` -> `VectorHolisticEDFAnalysis`
+
+Evaluates a whole `(K, n_tasks)` batch of local-deadline assignments **at once**
+with numpy, and reproduces the scalar analysis **bit for bit** (comparison-based
+window assignment, CPython-compatible compensated summation, expression-order
+matching). One batched call is several times faster than `K` scalar calls.
 
 ```python
-from gradient_descent.gradient_function import SequentialGradientFunction
+from vector.vector_edf import VectorHolisticEDFAnalysis
+
+wcrts = VectorHolisticEDFAnalysis().apply(system, deadlines)   # (K, n_tasks)
+# deadlines[j][i] is the local deadline of task i (system.tasks order) for
+# assignment j; the result is (K, n_tasks) WCRTs (inf where the analysis aborts).
 ```
 
-- Calls `HolisticLocalEDFAnalysis.apply()` **2n times** (central differences).
-- Each call runs the full scalar EDF analysis.
-- **Pro**: exact gradient.  **Con**: slow — O(n²) per optimizer iteration.
+The class takes an optional **`itcap`**: `None` (default) is the exact unbounded
+analysis; an integer caps the outer Gauss-Seidel loop and drops scenarios that
+abort or fail to converge within `itcap` sweeps (bit-identical to the unbounded
+analysis on converging scenarios, and robust as a *search* objective — the
+unbounded loop can need thousands of sweeps for badly infeasible assignments).
 
 ---
 
-## 3. Differentiable Surrogate
+## 5. Assignment algorithms
 
-**Files:** `surrogate/surrogate_edf.py`  
-**Development:** `workspace/surrogate_edf_local/`
+| Class | File | Uses |
+|---|---|---|
+| `PDAssignment` | `assignment/assignments.py` | proportional deadlines (baseline) |
+| `HOPAssignment` | `assignment/hopa_assignment.py` | iterative heuristic (scalar) |
+| `RTACDAssignment` | `assignment/rta_cd_assignment.py` | scalar response-time-guided coordinate descent |
+| `VecILSAssignment` | `assignment/vec_ils_assignment.py` | batched multi-start local search (uses `VectorHolisticEDFAnalysis`) |
 
-### Approach
+`RTACDAssignment` starts from an analytic assignment (tight-flow priority) and
+runs a coordinate descent on the local deadlines using the analysis itself as
+the objective, short-circuiting as soon as the `limit_factor=1` analysis reports
+the system schedulable.
 
-A fully-differentiable PyTorch model of the Holistic Local EDF equations:
+`VecILSAssignment` scores a **whole neighbourhood** of candidate deadline vectors
+per call with the vectorized analysis: best-improvement coordinate descent over
+a geometric grid of multiplicative moves, wrapped in an iterated local search
+(perturbed restarts) under a wall-clock budget.
 
-- Soft ceil/floor via sigmoid at half-integer boundaries.
-- Fixed uniform ψ grid (M = 50 points per job p).
-- Unrolled w_ab fixed point (N_w = 10 iterations).
-- Softmax over (p, ψ) for the worst-case response time.
-- Autograd to obtain ∇cost w.r.t. sigmoid-encoded deadlines.
-
-### Results
-
-| Metric | Value |
-|---|---|
-| WCRT correlation (Pearson r) | 0.82 |
-| Gradient cosine vs Seq | 0.31 |
-| % positive gradient | 90 % |
-| Schedulability (8 systems) | 7/8 (87 %) |
-| Speed-up per gradient | 13× |
-| Speed-up full optimisation | ~2× |
-
-### Why it falls short
-
-- The uniform ψ grid misses the critical absolute-deadline points where
-  interference changes discontinuously.
-- The soft ceil/floor approximations blur the gradient.
-- The surrogate cost (logsumexp) differs from the real cost (hard max).
-
-**Conclusion:** Viable as a proof-of-concept but not competitive with exact
-methods for schedulability.
+(The fixed-priority `SwapILSAssignment` in `assignment/swap_ils_assignment.py`
+belongs to the FP stack; see `FP_GRADIENT_DESCENT.md`.)
 
 ---
 
-## 4. Vectorized Exact Analysis – V1 (grid-based)
+## 6. Historical investigation (removed)
 
-**File:** `vector/vector_edf.py`
+Earlier vectorized EDF variants and a differentiable surrogate were explored and
+have since been removed from the tree; the key findings are kept below.
 
-### Approach
-
-Batched exact EDF analysis using a fixed ψ grid (M = 100):
-
-- Tensor shape `(scenarios, tasks, P_max, M)`.
-- Exact ceil/floor arithmetic (NumPy, not differentiable).
-- Same cache + early-termination architecture as `vector_fp.py`.
-
-### Bug discovered
-
-- **`D_limit` used task deadlines instead of flow deadlines** for the
-  over-limit check, causing premature termination and completely wrong WCRTs.
-- Fixed by adding `D_flow` (flow-level deadlines) separately.
-
-### Results (after fix)
-
-| Metric | Value |
-|---|---|
-| WCRT error vs scalar | ~4 % (grid discretisation) |
-| Gradient cosine vs Seq | 0.45 |
-| % positive gradient | 100 % |
-| Schedulability (8 systems) | 8/8 (100 %) |
-| Speed-up full optimisation | 2× |
+- **Vectorized V1 / V2 / V3** (files `vector/vector_edf.py` grid-based,
+  `vector/vector_edf_v2.py` exact `psi` set, `vector/vector_edf_v3.py`
+  per-scenario busy period) — **removed**, superseded by the bit-exact
+  `vector/vector_edf.py`.
+  - V2 matched the scalar analysis within ~1e-4 (not bit-exact) and
+    underestimated WCRTs on some perturbed scenarios.
+  - V1 used a fixed `psi` grid (~4 % error); V3 produced the same values as V2
+    but was slower.
+- **Differentiable surrogate** (`surrogate/surrogate_edf.py`, soft ceil/floor +
+  autograd over an unrolled fixed point) — **removed**. It reached ~87 %
+  schedulability and a ~13x per-gradient speed-up, but never beat the exact
+  methods (see §7.1).
 
 ---
 
-## 5. Vectorized Exact Analysis – V2 (exact ψ set)
+## 7. Key technical insights
 
-**File:** `vector/vector_edf_v2.py`  
-**Status:** ✅ Canonical version
+### 7.1 Why surrogates underperform
 
-### Approach
+The EDF scheduling decision compares absolute deadlines (`psi` vs `D_j`) — a
+step function. A sigmoid smoothing blurs the interference boundary, and a
+uniform `psi` grid misses the critical points where the step occurs. (FP
+surrogates hit the same wall through the priority-ordering indicator.)
 
-Instead of a uniform ψ grid, evaluates at the **exact same absolute-deadline
-points** used by the scalar analysis:
-
-- **Own deadlines:** (p−1)·T_i + D_i
-- **Interfering deadlines:** q·T_j − J_j + D_j, filtered by interval and
-  non-negative release time.
-- **Pure deadlines:** D_j (scalar adds `{t.deadline for t in tasks}`).
-
-Architecture:
-- Tasks processed sequentially in topological order (intra-iteration jitter
-  propagation).
-- Vectorised over **scenarios** (s = 2n+1 for finite differences).
-- `_compute_w` helper for the w_ab fixed point.
-
-### Bugs found and fixed
-
-1. **J_init used predecessor WCET, not cumulative WCRT.**
-   The scalar `init_wcrt` sets `task.wcrt = task.wcet + predecessor.wcrt`.
-   `task.jitter` (a property) returns `predecessor.wcrt`.  V2 initially used
-   `J_init[i] = C[pred]` instead of the cumulative value.
-   → Fixed by computing cumulative WCET in `_get_vectors`.
-
-2. **Cost function used task deadlines instead of flow deadlines.**
-   `InvslackCost` computes `max((flow.wcrt − flow.deadline) / flow.deadline)`.
-   V2 used `max((R[i] − D[i]) / D[i])` over all 12 tasks.
-   → Fixed by using `last_idx` (last task of each flow) and `flow.deadline`.
-
-3. **Busy period L computed once with J_init, never updated.**
-   The scalar recomputes `_busy_period` each iteration with the current
-   jitter.  As WCRTs increase, jitter increases, L increases, and more
-   interfering ψ values are considered.
-   → Fixed by recomputing L inside the outer loop with `J_ref = max(J, axis=0)`.
-
-### Remaining limitation
-
-6 out of 24 perturbed scenarios yield WCRTs that **do not match** the scalar
-analysis.  V2 underestimates WCRTs for these scenarios (by 13–112 units).
-The root cause appears to be in jitter propagation between scenarios within
-the outer convergence loop — the perturbed scenario's jitter is not fully
-updated in certain conditions.
-
-**Practical impact:** The optimisation achieves **110/140 (78.6 %)** vs the
-sequential gold standard **113/140 (80.7 %)** — a gap of only 3 systems out
-of 140.
-
-### Results
-
-| Metric | Value |
-|---|---|
-| WCRT match vs scalar (base) | max diff 2.6×10⁻⁵ |
-| WCRT match vs scalar (perturbed) | 18/24 scenarios exact |
-| Gradient cosine vs Seq | 0.56 |
-| Schedulability (8 systems) | 8/8 (100 %) |
-| Schedulability (140 eval) | 110/140 (78.6 %) |
-| Speed-up full optimisation | 1.7–1.8× |
-| Speed-up per gradient | 7–8× |
-
----
-
-## 6. Vectorized Exact Analysis – V3 (per-scenario L)
-
-**File:** `vector/vector_edf_v3.py`  
-**Status:** ⚠️ Experimental — same results as V2, slower
-
-### Approach
-
-Computes the busy period L **per scenario** (`_busy_period_multi` with
-broadcasting over s), rather than using max-jitter.  This was intended to
-eliminate over-estimation from conservative L.
-
-### Result
-
-V3 gives the **same WCRTs as V2** (same bug inherited) and is **slower**
-(0.28 s vs 0.16 s) due to the (s, n, n) tensor operations in
-`_busy_period_multi`.  Not recommended over V2.
-
----
-
-## 7. Comparative Evaluation (SchedRatioEval)
-
-20 systems, 12 utilisation levels (0.5–0.9), EDF scheduling, PD initialisation.
-
-### Schedulability (u ≤ 0.72, 7 levels × 20 = 140)
-
-| Method | Sched | Ratio | vs PD | Time |
-|---|---|---|---|---|
-| **PD** (Deadline Monotonic) | 59 | 42.1 % | — | 0.00 s |
-| GDPA-Surr (surrogate) | 69 | 49.3 % | +7 pp | 1.38 s |
-| **GDPA-Vec V2** | **110** | **78.6 %** | **+36 pp** | **1.42 s** |
-| HOPA | 92 | 65.7 % | +23 pp | 1.33 s |
-| GDPA-Seq (gold) | 113 | 80.7 % | +39 pp | 1.85 s |
-
-### V2 vs HOPA head-to-head
-
-| U | PD | HOPA | **Vec V2** | Winner |
-|---|---|------|---------|--------|
-| 0.50 | 16 | 20 | 20 | tie |
-| 0.54 | 13 | 18 | **19** | Vec |
-| 0.57 | 11 | 17 | **19** | Vec |
-| 0.61 | 7 | 15 | **18** | Vec |
-| 0.65 | 6 | 10 | **15** | Vec |
-| 0.68 | 4 | 6 | **12** | Vec |
-| 0.72 | 2 | 6 | **7** | Vec |
-
-**V2 beats HOPA at 6/7 utilisation levels.**  The gradient-based method
-consistently outperforms the specialised EDF heuristic.
-
-### Gap analysis
-
-- PD → Seq gap: 54 systems.
-- V2 captures **51/54 = 94.4 %** of the gap.
-- HOPA captures 33/54 = 61.1 %.
-- Surrogate captures 10/54 = 18.5 %.
-
----
-
-## 8. Key Technical Insights
-
-### 8.1 Why the surrogate underperforms
-
-The EDF scheduling decision depends on comparing absolute deadlines (ψ vs Dⱼ).
-This comparison is a step function — discontinuous.  The surrogate smooths it
-with a sigmoid, which blurs the interference boundary.  The uniform ψ grid
-misses the critical points where the step occurs.
-
-FP surrogates face a similar issue with priority ordering, which is also
-discrete.  However, EDF's deadline parameter is **continuous**, making a
-surrogate *conceptually* more viable than for FP.  The practical challenge is
-that the set Ψ is dynamic and the worst-case occurs at specific discontinuity
-points.
-
-### 8.2 Why vectorized EDF is harder than vectorized FP
+### 7.2 Vectorized EDF is harder than vectorized FP
 
 | FP | EDF |
 |---|---|
-| Priority matrix `(s, t, t)` — fixed boolean | Interference depends on ψ (continuous parameter) |
-| All tasks share same number of w-iterations | Different (task, p) pairs have different ψ sets |
-| No ψ dimension | Need 4D tensors `(s, t, P, M)` or per-task ψ construction |
+| Fixed boolean priority matrix `(s, t, t)` | Interference depends on `psi` (continuous) |
+| All tasks share the same number of `w` iterations | Different `(task, p)` pairs have different `psi` sets |
+| No `psi` dimension | A `(s, t, P, M)` tensor, or per-task `psi` construction |
 
-### 8.3 The critical role of the busy period
+The bit-exact implementation in `vector/vector_edf.py` avoids the `psi`-grid
+tensor: the candidate `psi` *values* do not depend on the outer index `p`, so the
+nested `(p, psi)` loop collapses into a single max per candidate, and the scalar
+arithmetic is reproduced expression-for-expression.
 
-The busy period L_i determines how many jobs (p values) and interfering
-deadlines (q values) to consider.  L_i depends on jitter J_j of all tasks
-on the same processor.  Jitter propagates across flows (predecessor WCRT)
-and across outer iterations.
+### 7.3 The critical role of the busy period
 
-**Failing to recompute L each iteration** was the single biggest bug —
-it caused V2 to miss 50 % of schedulable systems (80 → 110 after fix).
+The busy period `L_i` determines how many jobs (`p` values) and interfering
+deadlines (`q` values) to consider; it depends on the jitter of all tasks on the
+processor, which propagates across flows (predecessor WCRT) and across outer
+iterations. Failing to recompute `L` each iteration was the single biggest bug in
+the old V2 — it missed ~50 % of schedulable systems.
 
-### 8.4 Jitter initialisation
+### 7.4 Jitter initialisation
 
-`task.jitter` is a **property** returning `max(predecessor.wcrt)`.
-After `init_wcrt`, WCRTs are cumulative (task i's WCRT includes all
-predecessors' WCETs).  So jitter = predecessor's **cumulative WCET**, not
-just its WCET.  Using `C[pred]` instead of the cumulative value caused
-significant WCRT errors.
+`task.jitter` is a **property** returning the predecessor's WCRT. After
+`init_wcrt`, WCRTs are cumulative, so jitter = the predecessor's **cumulative
+WCET**, not just its WCET.
 
-### 8.5 Cost function alignment
+### 7.5 Cost function alignment
 
-`InvslackCost` computes cost over **flows** (end-to-end deadlines), not
-individual tasks.  The vectorized analysis must use `flow.deadline` and
-only the **last task** of each flow for the cost computation.
+`InvslackCost` measures over **flows** (end-to-end deadlines), not individual
+tasks: use `flow.deadline` and only the **last task** of each flow.
 
 ---
 
-## 9. File Map
+## 8. File map
 
 ```
 code/
-├── surrogate/
-│   └── surrogate_edf.py          ← differentiable surrogate + gradient
-├── vector/
-│   ├── vector_fp.py              ← vectorized FP analysis (reference)
-│   ├── vector_edf.py             ← V1: grid-based vectorized EDF
-│   ├── vector_edf_v2.py          ← V2: exact ψ set (CANONICAL)
-│   └── vector_edf_v3.py          ← V3: per-scenario L (experimental)
 ├── analysis/
-│   └── holistic_local_edf_analysis.py  ← scalar EDF analysis
+│   └── holistic_local_edf_analysis.py   scalar EDF analysis (the reference)
+├── vector/
+│   ├── vector_fp.py                     vectorized FP analysis
+│   └── vector_edf.py                    vectorized EDF analysis (bit-exact)
 ├── gradient_descent/
-│   ├── gradient_function.py      ← SequentialGradientFunction
-│   └── gradient_optimizer.py     ← GradientDescentOptimizer
-└── workspace/
-    ├── surrogate_edf_local/      ← surrogate development & validation
-    └── edf_vector_evaluation/    ← SchedRatioEval results & scripts
+│   ├── gradient_function.py             SequentialGradientFunction
+│   ├── parameter_handlers.py            DeadlineHandler
+│   ├── cost_functions.py                InvslackCost
+│   └── gradient_optimizer.py            GradientDescentOptimizer
+├── assignment/
+│   ├── assignments.py                   PDAssignment (baseline)
+│   ├── hopa_assignment.py               HOPAssignment (heuristic)
+│   ├── rta_cd_assignment.py             RTACDAssignment (scalar descent)
+│   └── vec_ils_assignment.py            VecILSAssignment (batched search)
+└── workspace/framework_paper/edf/       EDF scenario (paper evaluation)
 ```
 
 ---
 
-## 10. Usage
+## 9. Usage
 
-### Vectorized gradient descent (V2)
+### Sequential FD gradient (the paper's EDF scenario)
 
 ```python
-from vector.vector_edf_v2 import VectorEDFGradientFunctionV2
-from gradient_descent.gradient_optimizer import GradientDescentOptimizer
-from gradient_descent.parameter_handlers import DeadlineExtractor
-from gradient_descent.cost_functions import InvslackCost
 from analysis.holistic_local_edf_analysis import HolisticLocalEDFAnalysis
+from assignment.assignments import PDAssignment
+from gradient_descent.cost_functions import InvslackCost
+from gradient_descent.gradient_function import SequentialGradientFunction
+from gradient_descent.parameter_handlers import DeadlineHandler
 
 analysis = HolisticLocalEDFAnalysis(limit_factor=10, reset=False)
-ph = DeadlineExtractor()
-cost_fn = InvslackCost(parameter_handler=ph, analysis=analysis)
-grad_fn = VectorEDFGradientFunctionV2(sigma=1.5, cost_limit_factor=10)
+handler = DeadlineHandler()
+cost_fn = InvslackCost(parameter_handler=handler, analysis=analysis)
+grad_fn = SequentialGradientFunction(cost_function=cost_fn)
 
-optimizer = GradientDescentOptimizer(
-    parameter_handler=ph,
-    cost_function=cost_fn,
-    stop_function=...,
-    gradient_function=grad_fn,
-    update_function=...,
-)
-optimizer.apply(system)
+PDAssignment().apply(system)          # starting point
+# optimizer = GradientDescentOptimizer(parameter_handler=handler,
+#                                      cost_function=cost_fn,
+#                                      gradient_function=grad_fn, ...)
+# optimizer.apply(system)
 ```
 
-### Surrogate gradient descent
+### Batched vectorized analysis
 
 ```python
-from surrogate.surrogate_edf import SurrogateEDFGradient
+from vector.vector_edf import VectorHolisticEDFAnalysis
 
-grad_fn = SurrogateEDFGradient(tau=0.05, N_w=10, N_jitter=2, M_psi=50)
+vec = VectorHolisticEDFAnalysis()                  # exact
+vec = VectorHolisticEDFAnalysis(itcap=1000)        # bounded (search objective)
+R = vec.apply(system, deadlines)                   # (K, n_tasks)
 ```
 
-### Standalone vectorized EDF analysis
+### Assignment algorithms
 
 ```python
-from vector.vector_edf_v2 import VectorHolisticEDFAnalysisV2, ResultsCache
+from assignment.rta_cd_assignment import RTACDAssignment
+from assignment.vec_ils_assignment import VecILSAssignment
 
-vec = VectorHolisticEDFAnalysisV2(limit_factor=10, cache=ResultsCache())
-vec.apply(system)  # sets task.wcrt for the base system
-
-# With additional scenarios:
-vec.apply(system, scenarios_deadlines=D_array)  # D_array shape (s, n)
-R = vec.scenarios_response_times  # shape (n, s)
+RTACDAssignment(budget=20.0).apply(system)
+VecILSAssignment(improve_budget=30.0, max_total=48.0).apply(system)
 ```

@@ -1,0 +1,9 @@
+# Dependencies for this sandbox.
+#
+# numpy is provided (useful for a vectorized analysis). Add anything else you
+# need here, then install it in a local virtual environment inside the sandbox:
+#
+#     python -m venv .venv
+#     .venv/bin/pip install -r requirements.txt
+#     .venv/bin/python run.py
+numpy>=2.0

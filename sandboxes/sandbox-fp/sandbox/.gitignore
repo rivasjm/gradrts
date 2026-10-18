@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Results are local experiments, except the precomputed brute-force reference,
+# which must ship with every copy of the sandbox.
+results/**/*.json
+!results/**/brute-force.json
+!results/**/gdpa.json
+!results/**/hospa.json
+results/**/leaderboard.csv
+results/**/*.png
+
+# Scratch space: keep the directory, ignore its contents.
+tmp/*
+!tmp/.gitkeep
+
+# Optional local virtualenv.
+.venv/
+venv/

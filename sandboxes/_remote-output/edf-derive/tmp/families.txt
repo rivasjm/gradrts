@@ -1,0 +1,35 @@
+--- gamma interp pd->pd_global
+    g0                       708
+    g1                       772
+    g2                       801
+    g3                       814
+    g4                       813
+    g5                       814
+    g6                       808
+    g7                       785
+    g8                       774
+    g9                       756
+    g10                      744
+--- gamma lerp pd->flow.D
+    gD0                      708
+    gD1                      741
+    gD2                      733
+    gD3                      716
+    gD4                      694
+    gD5                      656
+    gD6                      620
+    gD7                      573
+    gD8                      522
+    gD9                      478
+    gD10                     406
+--- lambda scale pd
+    l0.5                     457
+    l0.75                    618
+    l1.0                     708
+    l1.5                     787
+    l2.0                     810
+    l3.0                     793
+    l5.0                     775
+--- equal / allD
+    equal                    314
+    allD                     407

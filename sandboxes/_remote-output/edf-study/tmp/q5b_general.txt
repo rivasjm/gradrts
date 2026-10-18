@@ -1,0 +1,24 @@
+*** deadline factor (5x3x3, balanced mapping) ***
+  dmin=0.3 dmax=0.5 total=250
+    gamma : {'g0.0': 73, 'g0.2': 77, 'g0.4': 67, 'g0.6': 54}
+    lambda: {'l1.0': 73, 'l1.5': 79, 'l2.0': 75, 'l3.0': 73}
+  dmin=0.5 dmax=1.0 total=250
+    gamma : {'g0.0': 179, 'g0.2': 200, 'g0.4': 198, 'g0.6': 199}
+    lambda: {'l1.0': 179, 'l1.5': 195, 'l2.0': 200, 'l3.0': 195}
+  dmin=0.8 dmax=1.0 total=250
+    gamma : {'g0.0': 212, 'g0.2': 229, 'g0.4': 232, 'g0.6': 225}
+    lambda: {'l1.0': 212, 'l1.5': 225, 'l2.0': 228, 'l3.0': 224}
+  dmin=1.0 dmax=2.0 total=250
+    gamma : {'g0.0': 248, 'g0.2': 250, 'g0.4': 250, 'g0.6': 249}
+    lambda: {'l1.0': 248, 'l1.5': 248, 'l2.0': 248, 'l3.0': 249}
+
+*** mapping: balanced vs random (5x3x3, dmin/dmax default) ***
+  shuffle=False total=250
+    gamma : {'g0.0': 179, 'g0.2': 200, 'g0.4': 198, 'g0.6': 199}
+    lambda: {'l1.0': 179, 'l1.5': 195, 'l2.0': 200, 'l3.0': 195}
+  shuffle=True total=250
+    gamma : {'g0.0': 179, 'g0.2': 209, 'g0.4': 210, 'g0.6': 209}
+    lambda: {'l1.0': 179, 'l1.5': 198, 'l2.0': 205, 'l3.0': 203}
+
+*** (3,5,3) lambda extended, to check the peak ***
+  total=250  {'l1.0': 125, 'l1.5': 157, 'l2.0': 170, 'l2.5': 171, 'l3.0': 174, 'l4.0': 170, 'l5.0': 170, 'l6.0': 169}

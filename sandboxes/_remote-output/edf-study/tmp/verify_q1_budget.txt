@@ -1,0 +1,33 @@
+--- budget-feasible: normalized cumulative shape (gamnorm) ---
+=== seed=42 size=15 systems=50 levels=20 instances=1000 ===
+  technique           sched   ratio    tot_t
+  gn0.0                 710   71.0%    0.007
+  gn0.2                 760   76.0%    0.008
+  gn0.5                 760   76.0%    0.007
+  gn0.8                 745   74.5%    0.007
+  gn1.0                 728   72.8%    0.007
+  gn1.5                 656   65.6%    0.007
+  gn2.0                 574   57.4%    0.007
+  gn3.0                 463   46.3%    0.007
+  gn4.0                 401   40.1%    0.007
+
+--- budget-feasible: back-loading weights w_k ~ beta^k ---
+=== seed=42 size=15 systems=50 levels=20 instances=1000 ===
+  technique           sched   ratio    tot_t
+  bl0.25                 34    3.4%    0.005
+  bl0.5                  95    9.5%    0.005
+  bl0.75                209   20.9%    0.005
+  bl1.0                 314   31.4%    0.005
+  bl1.5                 529   52.9%    0.005
+  bl2.0                 506   50.6%    0.005
+  bl3.0                 362   36.2%    0.005
+  bl5.0                 268   26.8%    0.005
+  bl10.0                212   21.2%    0.005
+
+--- overspending references for contrast ---
+=== seed=42 size=15 systems=50 levels=20 instances=1000 ===
+  technique           sched   ratio    tot_t
+  pd                    708   70.8%    0.003
+  gamma0.5              815   81.5%    0.004
+  lambda2               810   81.0%    0.003
+  pd_global             744   74.4%    0.004

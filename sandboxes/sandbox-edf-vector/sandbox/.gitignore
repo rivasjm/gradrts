@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Scratch space: keep the directory, ignore its contents.
+tmp/*
+!tmp/.gitkeep
+
+# Optional local virtualenv.
+.venv/
+venv/

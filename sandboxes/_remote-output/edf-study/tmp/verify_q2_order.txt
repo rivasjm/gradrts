@@ -1,0 +1,49 @@
+--- order effect: all 6 permutations of the pd share multiset ---
+=== seed=42 size=15 systems=50 levels=20 instances=1000 ===
+  technique           sched   ratio    tot_t
+  p(0, 1, 2)            708   70.8%    0.006
+  p(0, 2, 1)            182   18.2%    0.006
+  p(1, 0, 2)            209   20.9%    0.006
+  p(1, 2, 0)             70    7.0%    0.006
+  p(2, 0, 1)             70    7.0%    0.009
+  p(2, 1, 0)            240   24.0%    0.006
+
+--- magnitude effect: lambda (order fixed) ---
+=== seed=42 size=15 systems=50 levels=20 instances=1000 ===
+  technique           sched   ratio    tot_t
+  l1.0                  708   70.8%    0.004
+  l1.25                 770   77.0%    0.004
+  l1.5                  784   78.4%    0.004
+  l1.75                 798   79.8%    0.004
+  l2.0                  810   81.0%    0.004
+  l2.25                 802   80.2%    0.004
+
+--- per-level: pd, best-reverse order, lambda2, gamma0.5 ---
+=== seed=42 size=15 systems=50 levels=20 instances=1000 ===
+  technique           sched   ratio    tot_t
+  pd                    708   70.8%    0.004
+  rev                   240   24.0%    0.006
+  lambda2               810   81.0%    0.004
+  gamma0.5              815   81.5%    0.005
+  per level:
+        u          pd         rev     lambda2    gamma0.5
+    0.500          50          34          50          50
+    0.521          50          33          50          50
+    0.542          50          29          50          50
+    0.563          50          23          50          50
+    0.584          47          22          50          50
+    0.605          47          20          50          50
+    0.626          47          19          50          50
+    0.647          47          12          50          49
+    0.668          46          13          49          48
+    0.689          44           7          47          48
+    0.711          39           6          44          46
+    0.732          39           5          43          44
+    0.753          33           3          41          43
+    0.774          31           2          39          42
+    0.795          27           2          36          38
+    0.816          20           2          33          32
+    0.837          15           2          26          24
+    0.858          11           2          22          21
+    0.879           9           2          18          16
+    0.900           6           2          12          14
