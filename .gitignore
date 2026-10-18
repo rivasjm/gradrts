@@ -163,3 +163,5 @@ cython_debug/
 
 # Misc
 .DS_Store
+# local archive of legacy results and paper backups
+workspace/edf_wad/_archive/

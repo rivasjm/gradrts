@@ -1,0 +1,7 @@
+,0
+identity_schedulable,875
+instances_where_a_shuffle_helps,19
+shuffles_schedulable_where_identity_not,64
+shuffles_equal,8732
+shuffles_worse,11204
+total_shuffles,20000
